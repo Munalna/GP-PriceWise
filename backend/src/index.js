@@ -1,25 +1,34 @@
-import express from "express";
-import cors from "cors";
-import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+// Import routes
+import productRoutes from './routes/productRoutes.js';
+
+// Import middleware
+import { errorHandler } from './middleware/errorHandler.js';
+
+dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
-
-app.get("/health", (req, res) => res.json({ ok: true }));
-
-// تجريب: جلب المنتجات (لازم يكون عندكم جدول products في Supabase)
-app.get("/products", async (req, res) => {
-  const { data, error } = await supabase.from("products").select("*");
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+// Health check route
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// API Routes
+app.use('/api/products', productRoutes);
+
+// Error handling middleware (must be last)
+app.use(errorHandler);
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
