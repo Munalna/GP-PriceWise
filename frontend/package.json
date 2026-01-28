@@ -1,31 +1,5 @@
 {
   "name": "frontend",
-<<<<<<< HEAD
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "bootstrap": "^5.3.8",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "vite": "^7.2.4"
-=======
   "version": "0.1.0",
   "private": true,
   "proxy": "http://localhost:3000",
@@ -67,6 +41,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
->>>>>>> 2bd1071b1efce8a2bb9f98caccf9d159b5978dfb
   }
 }
