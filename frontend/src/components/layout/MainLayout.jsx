@@ -1,15 +1,14 @@
-import { Outlet } from "react-router-dom";
+import React from 'react';
+import Sidebar from './Sidebar';
+import './Layout.css';
 
-const MainLayout = () => {
+const MainLayout = ({ children }) => {
   return (
-    <div style={{ display: "flex" }}>
-      {/* Sidebar */}
-      <aside style={{ width: "200px" }}>Sidebar</aside>
-
-      {/* Page content */}
-      <main style={{ padding: "20px" }}>
-        <Outlet />
-      </main>
+    <div className="d-flex">
+      <Sidebar />
+      <div className="main-content">
+        {children}
+      </div>
     </div>
   );
 };
