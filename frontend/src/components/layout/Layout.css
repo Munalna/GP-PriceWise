@@ -1,4 +1,3 @@
-/* Custom sidebar styles - Bootstrap doesn't have good sidebar built-in */
 .sidebar-container {
   position: fixed;
   top: 0;
@@ -14,14 +13,14 @@
 
 .sidebar-header {
   padding: 25px 20px;
-  border-bottom: 2px solid #382372ff;
+  border-bottom: 2px solid #7B4B94 ;
   background-color: rgba(56, 35, 114, 0.2);
 }
 
 .sidebar-brand {
   font-size: 28px;
   font-weight: bold;
-  color: #382372ff;
+  color: #7B4B94 ;
   margin: 0;
   letter-spacing: 0.5px;
 }
@@ -66,12 +65,12 @@
 
 .sidebar-link:hover {
   background-color: rgba(56, 35, 114, 0.3);
-  border-left-color: #382372ff;
+  border-left-color: #7B4B94 ;
   color: white;
 }
 
 .sidebar-link.active {
-  background-color: #382372ff;
+  background-color: #7B4B94 ;
   border-left-color: #3498DB;
   font-weight: 600;
   color: white;
@@ -82,6 +81,59 @@
   padding: 30px;
   min-height: 100vh;
   background-color: #f8f9fa;
+}
+
+/* Custom button colors */
+.btn-primary {
+  background-color: #7B4B94  !important;
+  border-color: #7B4B94  !important;
+}
+
+.btn-primary:hover {
+  background-color: #2a1b59 !important;
+  border-color: #2a1b59 !important;
+}
+
+.btn-secondary {
+  background-color: #6f7478ff !important;
+  border-color: #6f7478ff !important;
+}
+
+.btn-secondary:hover {
+  background-color: #5a5d61 !important;
+  border-color: #5a5d61 !important;
+}
+
+/* Page headers */
+.page-title {
+  color: #6f7478ff;
+  font-weight: 700;
+}
+
+/* Card headers */
+.card-header {
+  background-color: #f8f9fa !important;
+  border-bottom: 2px solid #7B4B94  !important;
+}
+
+/* Table headers */
+.table-light {
+  background-color: #f8f9fa !important;
+}
+
+.table thead th {
+  color: #6f7478ff !important;
+  font-weight: 600;
+  border-bottom: 2px solid #7B4B94  !important;
+}
+
+/* Badge colors */
+.badge-purple {
+  background-color: #7B4B94  !important;
+}
+
+.badge-grey {
+  background-color: #6f7478ff !important;
 }
 
 /* Responsive */
@@ -97,5 +149,129 @@
   
   .main-content {
     margin-left: 0;
+  }
+}
+/* ==================== SIGNUP PAGE STYLES ==================== */
+
+.signup-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  background: #f6eefa; 
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.signup-card {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.signup-left-side {
+  background: linear-gradient(180deg, #6f7478ff 0%, #5a5d61 100%);  /* Match sidebar gradient */
+  color: white;
+  padding: 60px 40px;
+}
+
+.signup-title {
+  font-size: 48px;
+  font-weight: bold;
+  color: #ffffff ; 
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.signup-subtitle {
+  font-size: 18px;
+  line-height: 1.6;
+  opacity: 0.95;
+  color: #ECF0F1;  /* Match sidebar text */
+}
+
+.signup-features {
+  margin-top: 3rem;
+}
+
+.signup-feature-item {
+  padding: 10px 0;
+  font-size: 15px;
+  color: #ECF0F1;  /* Match sidebar text */
+}
+
+.signup-form-container {
+  padding: 50px 40px;
+  background: white;
+}
+
+.signup-heading {
+  font-size: 32px;
+  font-weight: bold;
+  color: #6f7478ff;  /* Grey - match page titles */
+  margin-bottom: 10px;
+}
+
+.signup-description {
+  color: #718096;
+  font-size: 15px;
+}
+
+.signup-input {
+  padding: 12px 15px;
+  font-size: 15px;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+}
+
+.signup-input:focus {
+  border-color: #7B4B94 ;  /* Purple focus - match primary */
+  box-shadow: 0 0 0 0.2rem rgba(56, 35, 114, 0.25);
+}
+
+.signup-label {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.signup-button {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  background: #7B4B94 ;  /* Purple - match primary button */
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.signup-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #2a1b59;  /* Darker purple on hover */
+  box-shadow: 0 4px 12px rgba(56, 35, 114, 0.3);
+}
+
+.signup-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.signup-link {
+  color: #3498db;  /* Blue accent - match your links */
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.signup-link:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+/* Signup Responsive */
+@media (max-width: 768px) {
+  .signup-title {
+    font-size: 36px;
+  }
+  
+  .signup-form-container {
+    padding: 30px 25px;
   }
 }
