@@ -1,4 +1,4 @@
-import { useState } from 'react'
+/*import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -43,4 +43,41 @@ function App3() {
   )
 }
 
-export default App3
+export default App3  */
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './components/layout/MainLayout';
+import Products from './pages/Products'; // تأكدنا أن الاستيراد شغال
+
+const Dashboard = () => <h2>Dashboard Page</h2>;
+const Costs = () => <h2>Costs Page</h2>;
+const Seasons = () => <h2>Seasons Page</h2>;
+const PricingRules = () => <h2>Pricing Rules Page</h2>;
+const Reports = () => <h2>Reports Page</h2>;
+const Analytics = () => <h2>Analytics Page</h2>;
+
+function App() {
+  return (
+    <Router>
+      <MainLayout>
+        <Routes>
+          {/* التوجيه التلقائي للوحة التحكم */}
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          
+          { }
+          <Route path="/products" element={<Products />} />
+          
+          {/* بقية المسارات */}
+          <Route path="/costs" element={<Costs />} />
+          <Route path="/seasons" element={<Seasons />} />
+          <Route path="/pricing-rules" element={<PricingRules />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/analytics" element={<Analytics />} />
+        </Routes>
+      </MainLayout>
+    </Router>
+  );
+}
+
+export default App;

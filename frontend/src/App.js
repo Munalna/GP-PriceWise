@@ -2,11 +2,11 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 // Remove or comment out this import:
-// import Products from './pages/Products';
+ import Products from './pages/Products';
 
 // Placeholder components for all pages
 const Dashboard = () => <h2>Dashboard Page - Teammate can work here</h2>;
-const Products = () => <h2>Products Page - Teammate can work here</h2>;  
+//const Products = () => <h2>Products Page - Teammate can work here</h2>;  
 const Costs = () => <h2>Costs Page - Teammate can work here</h2>;
 const Seasons = () => <h2>Seasons Page - Teammate can work here</h2>;
 const PricingRules = () => <h2>Pricing Rules Page - Teammate can work here</h2>;
