@@ -43,11 +43,12 @@ function App3() {
   )
 }
 
+
 export default App3  */
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
-import Products from './pages/Products'; // تأكدنا أن الاستيراد شغال
+import Products from './pages/Products';
 
 const Dashboard = () => <h2>Dashboard Page</h2>;
 const Costs = () => <h2>Costs Page</h2>;
@@ -61,14 +62,9 @@ function App() {
     <Router>
       <MainLayout>
         <Routes>
-          {/* التوجيه التلقائي للوحة التحكم */}
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          
-          { }
           <Route path="/products" element={<Products />} />
-          
-          {/* بقية المسارات */}
           <Route path="/costs" element={<Costs />} />
           <Route path="/seasons" element={<Seasons />} />
           <Route path="/pricing-rules" element={<PricingRules />} />
@@ -81,3 +77,4 @@ function App() {
 }
 
 export default App;
+
