@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
-import Login from "./pages/Login";
 
-// صفحات مؤقتة
-const Dashboard = () => <h2>Dashboard Page - Teammate can work here</h2>;
-const Products = () => <h2>Products Page - Teammate can work here</h2>;
-const Costs = () => <h2>Costs Page - Teammate can work here</h2>;
-const Seasons = () => <h2>Seasons Page - Teammate can work here</h2>;
-const PricingRules = () => <h2>Pricing Rules Page - Teammate can work here</h2>;
-const Reports = () => <h2>Reports Page - Teammate can work here</h2>;
-const Analytics = () => <h2>Analytics Page - Teammate can work here</h2>;
+// Auth pages
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import VerifyEmail from "./pages/VerifyEmail";
+
+// App pages
+import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import Costs from "./pages/Costs";
+// لو جاهزة فعّليها
+// import Seasons from "./pages/Seasons";
+// import PricingRules from "./pages/PricingRules";
+// import Reports from "./pages/Reports";
+// import Analytics from "./pages/Analytics";
 
 function App() {
   const [token, setToken] = useState(() => {
@@ -26,13 +31,15 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* أول صفحة */}
+        {/* ✅ Root */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* ✅ Login برا MainLayout */}
+        {/* ✅ Auth Routes (بدون MainLayout) */}
         <Route path="/login" element={<Login setToken={setToken} />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
 
-        {/* ✅ كل النظام داخل MainLayout ومحمّي */}
+        {/* ✅ Protected Routes (داخل MainLayout) */}
         <Route
           path="/dashboard"
           element={
@@ -66,6 +73,7 @@ function App() {
           }
         />
 
+        {/*
         <Route
           path="/seasons"
           element={
@@ -109,8 +117,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        */}
 
-        {/* أي رابط غلط */}
+        {/* ✅ أي رابط غلط */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
