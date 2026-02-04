@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 // Import routes
 import productRoutes from './routes/productRoutes.js';
+import authRoutes from './routes/authRoutes.js'; 
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);     
 app.use('/api/products', productRoutes);
 
 // Error handling middleware (must be last)
