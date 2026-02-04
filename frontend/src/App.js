@@ -8,7 +8,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Costs from './pages/Costs';
-//import Seasons from './pages/Seasons';
+import Seasons from './pages/Seasons';
 //import PricingRules from './pages/PricingRules';
 //import Reports from './pages/Reports';
 
@@ -28,7 +28,7 @@ function App() {
         <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
         <Route path="/products" element={<MainLayout><Products /></MainLayout>} />
         <Route path="/costs" element={<MainLayout><Costs /></MainLayout>} />
-      
+      <Route path="/seasons" element={<Seasons />} /> 
       </Routes>
     </Router>
   );
