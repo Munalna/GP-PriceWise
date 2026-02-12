@@ -1,59 +1,80 @@
 import { supabase } from '../config/supabase.js';
 
-// Get all products
-export const getAllProducts = async () => {
+// جلب البيانات
+export const getAllProducts = async (userId) => {
   const { data, error } = await supabase
-    .from('products')
-    .select('*');
-  
+    .from('categories')
+    .select('*, products(*)')
+    .eq('user_id', userId);
+
   if (error) throw error;
-  return data;
+  return data || [];
 };
 
-// Get product by ID
-export const getProductById = async (id) => {
+// جلب المكونات
+export const getVariableComponentsList = async (userId) => {
   const { data, error } = await supabase
-    .from('products')
+    .from('variable_components')
     .select('*')
-    .eq('id', id)
-    .single();
-  
+    .eq('owner_id', userId);
+
   if (error) throw error;
-  return data;
+  return data || [];
 };
 
-// Create new product
-export const createProduct = async (productData) => {
+// إضافة قسم
+export const createCategory = async (name, userId) => {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([{ name, user_id: userId }])
+    .select();
+
+  if (error) throw error;
+  return data[0];
+};
+
+// إضافة منتج
+export const createProduct = async (p, userId) => {
   const { data, error } = await supabase
     .from('products')
-    .insert([productData])
-    .select()
-    .single();
-  
+    .insert([{
+      name: p.name,
+      category_id: p.category_id,
+      components: p.components,
+      user_id: userId
+    }])
+    .select();
+
   if (error) throw error;
-  return data;
+  return data[0];
 };
 
-// Update product
-export const updateProduct = async (id, productData) => {
+
+export const updateProductById = async (id, updates, userId) => {
   const { data, error } = await supabase
     .from('products')
-    .update(productData)
+    .update({
+      name: updates.name,
+      components: updates.components,
+      c_price: updates.c_price,
+      comp_price: updates.comp_price,
+      b_cost: updates.b_cost 
+    })
     .eq('id', id)
-    .select()
-    .single();
-  
+    .eq('user_id', userId)
+    .select();
+
   if (error) throw error;
-  return data;
+  return data[0];
 };
 
-// Delete product
-export const deleteProduct = async (id) => {
+// حذف منتج
+export const deleteProductById = async (id, userId) => {
   const { error } = await supabase
     .from('products')
     .delete()
-    .eq('id', id);
-  
+    .eq('id', id)
+    .eq('user_id', userId);
+
   if (error) throw error;
-  return { message: 'Product deleted successfully' };
 };
