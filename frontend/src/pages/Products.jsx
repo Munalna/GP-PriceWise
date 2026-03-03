@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from '@supabase/supabase-js';
+import { Spinner, Alert } from "react-bootstrap";
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -12,11 +13,16 @@ function Products() {
   const [varComponents, setVarComponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
+  const [error, setError] = useState(""); 
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showCategoryInput, setShowCategoryInput] = useState(false);
+  
+  
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [productIdToDelete, setProductIdToDelete] = useState(null);
 
   const [newProd, setNewProd] = useState({
     name: "", components: [], category_id: ""
@@ -27,8 +33,18 @@ function Products() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
 
+  const calculateAvg = (prices) => {
+    if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
+    const validPrices = prices.map(p => Number(p)).filter(p => !isNaN(p));
+    if (validPrices.length === 0) return "0.00";
+    const sum = validPrices.reduce((acc, val) => acc + val, 0);
+    return (sum / validPrices.length).toFixed(2);
+  };
+
   const loadData = useCallback(async () => {
     if (!userId) return;
+    setError("");
+    setLoading(true);
     try {
       const authHeader = { 'user-id': userId };
       const response = await fetch(API_URL, { headers: authHeader });
@@ -39,9 +55,10 @@ function Products() {
       const vcData = await vcRes.json();
       setVarComponents(Array.isArray(vcData) ? vcData : []);
 
-      setLoading(false);
     } catch (err) {
       console.error("Fetch error:", err);
+      setError(err.message || "Failed to load products.");
+    } finally {
       setLoading(false);
     }
   }, [userId]);
@@ -53,7 +70,7 @@ function Products() {
         setUserId(user.id);
       } else {
         setLoading(false);
-        console.error("No active session found. Please login.");
+        setError("No active session found. Please login.");
       }
     };
     getAuthenticatedUser();
@@ -97,7 +114,7 @@ function Products() {
     const target = isEdit ? selectedProduct : newProd;
     const intVal = Math.max(0, parseInt(val, 10) || 0);
     
-    let updatedComps = target.components.map(c => 
+    let updatedComps = target.components.map(c =>
       c.name === name ? { ...c, qty: intVal } : c
     );
 
@@ -121,7 +138,7 @@ function Products() {
         setNewCatName("");
         setShowCategoryInput(false);
       }
-    } catch (err) { alert("Error adding category"); }
+    } catch (err) { setError("Error adding category"); }
   };
 
   const handleSaveProduct = async () => {
@@ -133,7 +150,7 @@ function Products() {
         body: JSON.stringify({
             ...newProd,
             components: JSON.stringify(newProd.components),
-            v_cost: calculateTotalVcost(newProd.components).toString(), 
+            v_cost: calculateTotalVcost(newProd.components).toString(),
             b_cost: "0.00", c_price: "0.00", comp_price: "0.00"
         })
       });
@@ -142,7 +159,7 @@ function Products() {
         setShowAddModal(false);
         setNewProd({ name: "", components: [], category_id: "" });
       }
-    } catch (err) { alert("Error saving product"); }
+    } catch (err) { setError("Error saving product"); }
   };
 
   const handleUpdateProduct = async () => {
@@ -156,25 +173,36 @@ function Products() {
           v_cost: calculateTotalVcost(selectedProduct.components).toString(),
           c_price: selectedProduct.c_price,
           comp_price: selectedProduct.comp_price,
-          b_cost: selectedProduct.b_cost // إرسال التكلفة الأساسية الجديدة
+          b_cost: selectedProduct.b_cost
         })
       });
       if (res.ok) {
-        await loadData(); 
+        await loadData();
         setShowEditModal(false);
       }
-    } catch (err) { alert("Error updating product"); }
+    } catch (err) { setError("Error updating product"); }
   };
 
-  const handleDeleteProduct = async (id) => {
-    if (!window.confirm("Are you sure?")) return;
+  // --- تحديث دالة الحذف لتتعامل مع المودل المخصص ---
+  const confirmDelete = async () => {
+    if (!productIdToDelete) return;
+    
     try {
-      const res = await fetch(`${API_URL}/${id}`, { 
+      const res = await fetch(`${API_URL}/${productIdToDelete}`, {
         method: 'DELETE',
         headers: { 'user-id': userId }
       });
-      if (res.ok) await loadData();
-    } catch (err) { alert("Error deleting product"); }
+      if (res.ok) {
+        setCategories(prev => prev.map(cat => ({
+          ...cat,
+          products: cat.products.filter(p => p.id !== productIdToDelete)
+        })));
+        setShowDeleteConfirm(false);
+        setProductIdToDelete(null);
+      }
+    } catch (err) {
+      setError("Error deleting product");
+    }
   };
 
   const handleSaveRules = async () => {
@@ -191,7 +219,7 @@ function Products() {
         setShowRulesModal(false);
       }
     } catch (err) {
-      alert("Error saving rules");
+      setError("Error saving rules");
     }
   };
 
@@ -201,9 +229,6 @@ function Products() {
     try { return JSON.parse(compData); } catch(e) { return []; }
   };
 
-  if (loading) return <div style={loadingStyle}>Loading...</div>;
-  if (!userId) return <div style={loadingStyle}>Please log in to view your products.</div>;
-
   return (
     <div style={pageContainer}>
       <div style={headerStyle}>
@@ -211,83 +236,118 @@ function Products() {
         <button style={btnMainAdd} onClick={() => setShowAddModal(true)}>+ Add Product</button>
       </div>
 
-      {categories.length === 0 ? (
-        <div style={emptySimpleStyle}>There is no product yet</div>
-      ) : (
-        categories.map(cat => (
-          <div key={cat.id} style={categoryCard}>
-            <div style={categoryHeader}>
-              <div>
-                <h2 style={catTitleText}>{cat.name}</h2>
-                <div style={badgeRow}>
-                  {(cat.rules || []).map((rule, idx) => <span key={idx} style={orangeBadgeSmall}>{rule}</span>)}
-                </div>
-              </div>
-              <button style={btnAssignRules} onClick={() => { 
-                setSelectedCategory(cat); 
-                setSelectedProduct(null); 
-                setTempSelectedRules(cat.rules || []); 
-                setShowRulesModal(true); 
-              }}>🔗 Assign Rules</button>
-            </div>
+      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
-            {cat.products && cat.products.length > 0 ? (
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Product Name</th>
-                    <th style={thStyle}>Components</th>
-                    <th style={thStyle}>Variable Cost</th>
-                    <th style={thStyle}>Base Cost</th>
-                    <th style={thStyle}>Current Price</th>
-                    <th style={thStyle}>Recommended</th>
-                    <th style={thStyle}>Competitor</th>
-                    <th style={thStyle}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cat.products.map(prod => {
-                    const comps = parseComponents(prod.components);
-                    return (
-                      <tr key={prod.id}>
-                        <td style={tdStyle}>
-                          <div style={prodNameText}>{prod.name}</div>
-                          {(prod.rules || []).map((r, i) => <div key={i} style={blueBadgeSmall}>{r}</div>)}
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
-                            {comps.length > 0 ? comps.map((c, i) => (
-                              <span key={i} style={compBadgeStyle}>{c.name} {c.qty}</span>
-                            )) : "—"}
-                          </div>
-                        </td>
-                        <td style={tdStyle}>{calculateTotalVcost(comps)} SAR</td>
-                        <td style={tdStyle}>{prod.b_cost} SAR</td>
-                        <td style={tdStyle}>{prod.c_price} SAR</td>
-                        <td style={{ ...tdStyle, color: "#27ae60", fontWeight: "bold" }}>{prod.r_price} SAR</td>
-                        <td style={tdStyle}>{prod.comp_price} SAR</td>
-                        <td style={tdStyle}>
-                          <div style={actionGroup}>
-                            <button style={actionBtnBlue} onClick={() => { 
-                              setSelectedProduct({...prod, components: comps}); 
-                              setSelectedCategory(null);
-                              setTempSelectedRules(prod.rules || []); 
-                              setShowRulesModal(true); 
-                            }}>🔗</button>
-                            <button style={actionBtnOrange} onClick={() => { setSelectedProduct({...prod, components: comps}); setShowEditModal(true); }}>✏️</button>
-                            <button style={actionBtnRed} onClick={() => handleDeleteProduct(prod.id)}>🗑️</button>
-                          </div>
-                        </td>
+      {loading ? (
+        <div className="d-flex align-items-center gap-2" style={{ padding: "100px", justifyContent: "center" }}>
+          <Spinner animation="border" size="sm" variant="primary" />
+          <span style={{ color: "#5b2d89", fontWeight: "600" }}>Loading...</span>
+        </div>
+      ) : (
+        <>
+          {!userId ? (
+            <div style={loadingStyle}>Please log in to view your products.</div>
+          ) : categories.length === 0 ? (
+            <div style={emptySimpleStyle}>There is no product yet</div>
+          ) : (
+            categories.map(cat => (
+              <div key={cat.id} style={categoryCard}>
+                <div style={categoryHeader}>
+                  <div>
+                    <h2 style={catTitleText}>{cat.name}</h2>
+                    <div style={badgeRow}>
+                      {(cat.rules || []).map((rule, idx) => <span key={idx} style={orangeBadgeSmall}>{rule}</span>)}
+                    </div>
+                  </div>
+                  <button style={btnAssignRules} onClick={() => {
+                    setSelectedCategory(cat);
+                    setSelectedProduct(null);
+                    setTempSelectedRules(cat.rules || []);
+                    setShowRulesModal(true);
+                  }}>🔗 Assign Rules</button>
+                </div>
+
+                {cat.products && cat.products.length > 0 ? (
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Product Name</th>
+                        <th style={thStyle}>Components</th>
+                        <th style={thStyle}>Variable Cost</th>
+                        <th style={thStyle}>Base Cost</th>
+                        <th style={thStyle}>Current Price</th>
+                        <th style={thStyle}>Recommended</th>
+                        <th style={thStyle}>Competitor</th>
+                        <th style={thStyle}>Avg Competitors Price</th>
+                        <th style={thStyle}>Actions</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <div style={emptyPlaceholderText}>No products in this category.</div>
-            )}
+                    </thead>
+                    <tbody>
+                      {cat.products.map(prod => {
+                        const comps = parseComponents(prod.components);
+                        return (
+                          <tr key={prod.id}>
+                            <td style={tdStyle}>
+                              <div style={prodNameText}>{prod.name}</div>
+                              {(prod.rules || []).map((r, i) => <div key={i} style={blueBadgeSmall}>{r}</div>)}
+                            </td>
+                            <td style={tdStyle}>
+                              <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
+                                {comps.length > 0 ? comps.map((c, i) => (
+                                  <span key={i} style={compBadgeStyle}>{c.name} {c.qty}</span>
+                                )) : "—"}
+                              </div>
+                            </td>
+                            <td style={tdStyle}>{calculateTotalVcost(comps)} SAR</td>
+                            <td style={tdStyle}>{prod.b_cost} SAR</td>
+                            <td style={tdStyle}>{prod.c_price} SAR</td>
+                            <td style={{ ...tdStyle, color: "#27ae60", fontWeight: "bold" }}>{prod.r_price} SAR</td>
+                            <td style={tdStyle}>{prod.comp_price} SAR</td>
+                            <td style={{...tdStyle, color: "#5b2d89", fontWeight: "600"}}>
+                              {calculateAvg(prod.competitors_prices)} SAR
+                            </td>
+                            <td style={tdStyle}>
+                              <div style={actionGroup}>
+                                <button style={actionBtnBlue} onClick={() => {
+                                  setSelectedProduct({...prod, components: comps});
+                                  setSelectedCategory(null);
+                                  setTempSelectedRules(prod.rules || []);
+                                  setShowRulesModal(true);
+                                }}>🔗</button>
+                                <button style={actionBtnOrange} onClick={() => { setSelectedProduct({...prod, components: comps}); setShowEditModal(true); }}>✏️</button>
+                                <button style={actionBtnRed} onClick={() => {
+                                  setProductIdToDelete(prod.id);
+                                  setShowDeleteConfirm(true);
+                                }}>🗑️</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={emptyPlaceholderText}>No products in this category.</div>
+                )}
+              </div>
+            ))
+          )}
+        </>
+      )}
+
+      {/* --- Delete Confirmation Modal --- */}
+      {showDeleteConfirm && (
+        <div style={modalOverlay}>
+          <div style={{...modalContentCustom, width: '350px', textAlign: 'center'}}>
+            <div style={{fontSize: '40px', marginBottom: '10px'}}>⚠️</div>
+            <h3 style={{...modalTitleCustom, fontSize: '20px', marginBottom: '10px'}}>Are you sure?</h3>
+            <p style={{color: '#666', fontSize: '14px', marginBottom: '25px'}}>This action cannot be undone. The product will be permanently removed.</p>
+            <div style={{...modalFooterCustom, justifyContent: 'center'}}>
+              <button style={{...btnCancelCustom, padding: '10px 20px'}} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button style={{...btnSaveCustom, backgroundColor: '#e74c3c', padding: '10px 20px'}} onClick={confirmDelete}>Delete</button>
+            </div>
           </div>
-        ))
+        </div>
       )}
 
       {/* --- ADD MODAL --- */}
@@ -331,8 +391,8 @@ function Products() {
               )}
             </div>
             <div style={modalFooterCustom}>
-              <button style={btnCancelCustom} onClick={() => setShowAddModal(false)}>Cancel</button>
               <button style={btnSaveCustom} onClick={handleSaveProduct}>Save</button>
+              <button style={btnCancelCustom} onClick={() => setShowAddModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -375,15 +435,14 @@ function Products() {
                 <input type="text" placeholder="0.00" style={inputFieldCustom} value={selectedProduct.comp_price || ""} onChange={e => setSelectedProduct({...selectedProduct, comp_price: e.target.value})} />
               </div>
 
-              {}
               <div style={inputGroup}>
                 <label style={labelStyle}>Base Cost (SAR)</label>
-                <input 
-                  type="text" 
-                  placeholder="0.00" 
-                  style={inputFieldCustom} 
-                  value={selectedProduct.b_cost || ""} 
-                  onChange={e => setSelectedProduct({...selectedProduct, b_cost: e.target.value})} 
+                <input
+                  type="text"
+                  placeholder="0.00"
+                  style={inputFieldCustom}
+                  value={selectedProduct.b_cost || ""}
+                  onChange={e => setSelectedProduct({...selectedProduct, b_cost: e.target.value})}
                 />
               </div>
 
@@ -393,13 +452,14 @@ function Products() {
               </div>
             </div>
             <div style={modalFooterCustom}>
-              <button style={btnCancelCustom} onClick={() => setShowEditModal(false)}>Cancel</button>
               <button style={btnSaveCustom} onClick={handleUpdateProduct}>Save Changes</button>
+              <button style={btnCancelCustom} onClick={() => setShowEditModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* --- RULES MODAL --- */}
       {showRulesModal && (
         <div style={modalOverlay}>
           <div style={modalContentCustom}>
@@ -418,8 +478,8 @@ function Products() {
               ))}
             </div>
             <div style={modalFooterCustom}>
-              <button style={btnCancelCustom} onClick={() => setShowRulesModal(false)}>Cancel</button>
               <button style={btnSaveCustom} onClick={handleSaveRules}>Assign Rules</button>
+              <button style={btnCancelCustom} onClick={() => setShowRulesModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -428,6 +488,7 @@ function Products() {
   );
 }
 
+// --- استايلات ثابتة ---
 const pricingRules = [
   { title: "Minimum 30% Margin", desc: "Ensure price stays above 30% profit" },
   { title: "Round to Nearest 5", desc: "Prices like 18.5 become 20.00" },
@@ -454,7 +515,8 @@ const prodNameText = { fontWeight: "600", color: "#2d1b4e" };
 const actionGroup = { display: "flex", gap: "8px" };
 const actionBtnBase = { border: "none", color: "white", width: "32px", height: "32px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 const actionBtnBlue = { ...actionBtnBase, backgroundColor: "#3498db" };
-const actionBtnOrange = { ...actionBtnBase, backgroundColor: "#f39c12" };
+// تم تحديث خلفية زر التعديل هنا لتكون درجة أفتح
+const actionBtnOrange = { ...actionBtnBase, backgroundColor: "#ffb74d" }; 
 const actionBtnRed = { ...actionBtnBase, backgroundColor: "#e74c3c" };
 const modalOverlay = { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 };
 const modalContentCustom = { backgroundColor: "white", padding: "35px", borderRadius: "25px", width: "450px" };
