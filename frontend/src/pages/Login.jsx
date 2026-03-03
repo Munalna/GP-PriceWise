@@ -298,6 +298,12 @@ const Login = ({ setToken }) => {
                       )}
                     </Form.Group>
 
+                    <div className="text-end mb-4">
+                      <Link to="/forgot-password" className="signup-link">
+                        Forgot Password?
+                      </Link>
+                    </div>
+
                     {/* Submit Button */}
                     <Button type="submit" disabled={loading} className="signup-button">
                       {loading ? (

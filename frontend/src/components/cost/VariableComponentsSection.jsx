@@ -45,18 +45,18 @@ const VariableComponentsSection = ({ items, onAdd, onEdit, onDelete }) => {
                   <td>
                     <Button
                       size="sm"
-                      variant="outline-primary"
-                      className="me-2"
-                      onClick={() => { setEditing(c); setShowModal(true); }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
                       variant="outline-danger"
+                      className="me-2"
                       onClick={() => setDeleting(c)}
                     >
                       Delete
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-primary"
+                      onClick={() => { setEditing(c); setShowModal(true); }}
+                    >
+                      Edit
                     </Button>
                   </td>
                 </tr>
