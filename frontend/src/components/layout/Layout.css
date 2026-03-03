@@ -230,6 +230,11 @@
   box-shadow: 0 0 0 0.2rem rgba(56, 35, 114, 0.25);
 }
 
+.no-native-reveal::-ms-reveal,
+.no-native-reveal::-ms-clear {
+  display: none;
+}
+
 .signup-label {
   font-weight: 600;
   color: #2d3748;

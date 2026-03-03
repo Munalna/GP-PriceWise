@@ -258,7 +258,7 @@ const Login = ({ setToken }) => {
                           onChange={handleChange}
                           onBlur={handleBlur}
                           disabled={loading}
-                          className={getInputClassName('password')}
+                          className={`${getInputClassName('password')} no-native-reveal`}
                           style={{ borderRight: "none" }}
                           isInvalid={touched.password && !!fieldErrors.password}
                           maxLength={128}

@@ -337,7 +337,7 @@ const Signup = () => {
                           onChange={handleChange}
                           onBlur={handleBlur}
                           disabled={loading}
-                          className={getInputClassName('password')}
+                          className={`${getInputClassName('password')} no-native-reveal`}
                           style={{ borderRight: 'none' }}
                           isInvalid={touched.password && !!fieldErrors.password}
                           maxLength={128}
@@ -387,7 +387,7 @@ const Signup = () => {
                           onChange={handleChange}
                           onBlur={handleBlur}
                           disabled={loading}
-                          className={getInputClassName('confirmPassword')}
+                          className={`${getInputClassName('confirmPassword')} no-native-reveal`}
                           style={{ borderRight: 'none' }}
                           isInvalid={touched.confirmPassword && !!fieldErrors.confirmPassword}
                           maxLength={128}
