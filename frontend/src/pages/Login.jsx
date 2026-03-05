@@ -258,7 +258,7 @@ const Login = ({ setToken }) => {
                           onChange={handleChange}
                           onBlur={handleBlur}
                           disabled={loading}
-                          className={getInputClassName('password')}
+                          className={`${getInputClassName('password')} no-native-reveal`}
                           style={{ borderRight: "none" }}
                           isInvalid={touched.password && !!fieldErrors.password}
                           maxLength={128}
@@ -297,6 +297,12 @@ const Login = ({ setToken }) => {
                         </Form.Text>
                       )}
                     </Form.Group>
+
+                    <div className="text-end mb-4">
+                      <Link to="/forgot-password" className="signup-link">
+                        Forgot Password?
+                      </Link>
+                    </div>
 
                     {/* Submit Button */}
                     <Button type="submit" disabled={loading} className="signup-button">

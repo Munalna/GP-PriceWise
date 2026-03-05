@@ -54,7 +54,9 @@ const VariableComponentModal = ({ show, onHide, onSave, initialValue }) => {
         {error && <Alert variant="danger">{error}</Alert>}
 
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Component Name</Form.Label>
+          <Form.Label className="fw-semibold">
+            Component Name <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Control
             type="text"
             placeholder="e.g., Milk"
@@ -64,7 +66,9 @@ const VariableComponentModal = ({ show, onHide, onSave, initialValue }) => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Measurement Unit</Form.Label>
+          <Form.Label className="fw-semibold">
+            Measurement Unit <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Select value={unit} onChange={(e) => setUnit(e.target.value)}>
             {UNITS.map((u) => (
               <option key={u} value={u}>{u}</option>
@@ -73,7 +77,9 @@ const VariableComponentModal = ({ show, onHide, onSave, initialValue }) => {
         </Form.Group>
 
         <Form.Group>
-          <Form.Label className="fw-semibold">Cost per Unit (SAR)</Form.Label>
+          <Form.Label className="fw-semibold">
+            Cost per Unit (SAR) <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Control
             type="number"
             step="0.0001"
@@ -85,10 +91,10 @@ const VariableComponentModal = ({ show, onHide, onSave, initialValue }) => {
       </Modal.Body>
 
       <Modal.Footer>
-        <Button variant="secondary" onClick={onHide}>Cancel</Button>
         <Button variant="primary" onClick={handleSubmit}>
           {initialValue ? "Save Changes" : "Save"}
         </Button>
+        <Button variant="secondary" onClick={onHide}>Cancel</Button>
       </Modal.Footer>
     </Modal>
   );

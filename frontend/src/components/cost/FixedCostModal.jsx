@@ -54,7 +54,9 @@ const FixedCostModal = ({ show, onHide, onSave, initialValue }) => {
         {error && <Alert variant="danger">{error}</Alert>}
 
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Name</Form.Label>
+          <Form.Label className="fw-semibold">
+            Name <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Control
             type="text"
             placeholder="e.g., Monthly Rent"
@@ -64,7 +66,9 @@ const FixedCostModal = ({ show, onHide, onSave, initialValue }) => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Amount (SAR)</Form.Label>
+          <Form.Label className="fw-semibold">
+            Amount (SAR) <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Control
             type="number"
             step="0.01"
@@ -75,7 +79,9 @@ const FixedCostModal = ({ show, onHide, onSave, initialValue }) => {
         </Form.Group>
 
         <Form.Group>
-          <Form.Label className="fw-semibold">Period</Form.Label>
+          <Form.Label className="fw-semibold">
+            Period <span className="text-danger ms-1">*</span>
+          </Form.Label>
           <Form.Select value={period} onChange={(e) => setPeriod(e.target.value)}>
             {PERIODS.map((p) => (
               <option key={p} value={p}>{p}</option>
@@ -85,10 +91,10 @@ const FixedCostModal = ({ show, onHide, onSave, initialValue }) => {
       </Modal.Body>
 
       <Modal.Footer>
-        <Button variant="secondary" onClick={onHide}>Cancel</Button>
         <Button variant="primary" onClick={handleSubmit}>
           {initialValue ? "Save Changes" : "Save"}
         </Button>
+        <Button variant="secondary" onClick={onHide}>Cancel</Button>
       </Modal.Footer>
     </Modal>
   );
