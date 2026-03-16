@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Costs from './pages/Costs';
 import Seasons from './pages/Seasons';
-//import PricingRules from './pages/PricingRules';
+import PricingRules from "./pages/PricingRules";
 //import Reports from './pages/Reports';
 //import Analytics from './pages/Analytics';
 
@@ -43,6 +43,7 @@ function App() {
         <Route path="/products" element={<ProtectedRoute><MainLayout><Products /></MainLayout></ProtectedRoute>} />
         <Route path="/costs" element={<ProtectedRoute><MainLayout><Costs /></MainLayout></ProtectedRoute>} />
         <Route path="/seasons" element={<ProtectedRoute><MainLayout><Seasons /></MainLayout></ProtectedRoute>} />
+        <Route path="/pricing-rules" element={<ProtectedRoute><MainLayout><PricingRules /></MainLayout></ProtectedRoute>}/>
     
 
         {/* Any wrong route */}
