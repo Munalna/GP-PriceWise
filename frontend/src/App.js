@@ -36,6 +36,7 @@ function App() {
         {/* Auth Routes */}
         <Route path="/login" element={<Login setToken={setToken} />} />
         <Route path="/signup" element={<Signup />} />
+
         <Route path="/verify-email" element={<VerifyEmail />} />
 
         {/* Protected App Routes */}
@@ -47,6 +48,18 @@ function App() {
 
         {/* Any wrong route */}
         <Route path="*" element={<Navigate to="/login" replace />} />
+
+          <Route path="/verify-email" element={<VerifyEmail />} />  {/* ← ADD THIS */}
+
+        
+        {/* Redirect root to signup */}
+        <Route path="/" element={<Navigate to="/signup" />} />
+        
+        {/* Protected Routes (With Layout) */}
+        <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
+        <Route path="/products" element={<MainLayout><Products /></MainLayout>} />
+        <Route path="/costs" element={<MainLayout><Costs /></MainLayout>} />
+      <Route path="/seasons" element={<Seasons />} /> 
       </Routes>
     </Router>
   );

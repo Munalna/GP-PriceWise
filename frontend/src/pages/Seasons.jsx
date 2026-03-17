@@ -14,13 +14,13 @@ export default function Seasons() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
 
- const normalize = (row) => ({
-  id: row?.id,
-  name: row?.season_name ?? "",
-  startDate: row?.start_date ?? "",
-  endDate: row?.end_date ?? "",
-  active: row?.is_active ?? false,
-});
+  const normalize = (row) => ({
+    id: row?.id,
+    name: row?.season_name ?? "",
+    startDate: row?.start_date ?? "",
+    endDate: row?.end_date ?? "",
+    active: row?.is_active ?? false,
+  });
 
   const load = async () => {
     setError("");
@@ -65,7 +65,9 @@ export default function Seasons() {
         setSeasons((prev) => [...prev, normalize(created)]);
       } else {
         const updated = await updateSeason(editing.id, { name, startDate, endDate });
-        setSeasons((prev) => prev.map((x) => (x.id === editing.id ? normalize(updated) : x)));
+        setSeasons((prev) =>
+          prev.map((x) => (x.id === editing.id ? normalize(updated) : x))
+        );
       }
       setShowModal(false);
       setEditing(null);
@@ -196,8 +198,9 @@ function SeasonModal({ initial, onClose, onSave }) {
     if (!name.trim()) return alert("Season name required");
     if (!startDate) return alert("Start date required");
     if (!endDate) return alert("End date required");
-    if (new Date(endDate) < new Date(startDate))
+    if (new Date(endDate) < new Date(startDate)) {
       return alert("End date must be after start date");
+    }
     onSave({ name: name.trim(), startDate, endDate });
   };
 
