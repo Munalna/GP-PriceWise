@@ -6,6 +6,11 @@ import dotenv from "dotenv";
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import seasonRoutes from "./routes/seasonRoutes.js";
+// إذا سويتِ notification routes بعدين، فكّي التعليق:
+// import notificationRoutes from "./routes/notificationRoutes.js";
+
+// Jobs
+import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 
 // Middleware
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -15,11 +20,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Core middleware
+/* -------------------------------------------------- */
+/* Core Middleware */
+/* -------------------------------------------------- */
+
 app.use(cors());
 app.use(express.json());
 
-// Health check
+/* -------------------------------------------------- */
+/* Health Check */
+/* -------------------------------------------------- */
+
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
@@ -27,22 +38,43 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API routes
+/* -------------------------------------------------- */
+/* API Routes */
+/* -------------------------------------------------- */
+
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/seasons", seasonRoutes);
 
-// 404 handler
+// إذا أضفتِ notification routes بعدين، فكّي التعليق:
+// app.use("/api/notifications", notificationRoutes);
+
+/* -------------------------------------------------- */
+/* 404 Handler */
+/* -------------------------------------------------- */
+
 app.use((req, res) => {
   res.status(404).json({
     message: "Route not found",
   });
 });
 
-// Global error handler (must be last)
+/* -------------------------------------------------- */
+/* Global Error Handler */
+/* -------------------------------------------------- */
+
 app.use(errorHandler);
 
-// Start server
+/* -------------------------------------------------- */
+/* Start Background Jobs */
+/* -------------------------------------------------- */
+
+startSeasonScheduler();
+
+/* -------------------------------------------------- */
+/* Start Server */
+/* -------------------------------------------------- */
+
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
 });

@@ -2,6 +2,10 @@ import { supabaseAdmin } from "../config/supabase.js";
 
 const TABLE = "seasons";
 
+/* -------------------------------------------------- */
+/* Helpers */
+/* -------------------------------------------------- */
+
 function computeIsActive(startDate, endDate) {
   const today = new Date();
   const start = new Date(startDate);
@@ -13,6 +17,22 @@ function computeIsActive(startDate, endDate) {
 
   return today >= start && today <= end;
 }
+
+function getTodayDateInRiyadh() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(now); // YYYY-MM-DD
+}
+
+/* -------------------------------------------------- */
+/* User Operations */
+/* -------------------------------------------------- */
 
 export async function getSeasonsByUser(userId) {
   const { data, error } = await supabaseAdmin
@@ -33,8 +53,6 @@ export async function createSeason(userId, payload) {
     end_date: payload.endDate,
     is_active: computeIsActive(payload.startDate, payload.endDate),
   };
-
-  console.log("INSERT ROW:", row);
 
   const { data, error } = await supabaseAdmin
     .from(TABLE)
@@ -93,4 +111,34 @@ export async function deleteSeason(userId, id) {
 
   if (error) throw error;
   return !!data;
+}
+
+/* -------------------------------------------------- */
+/* System Operations (Scheduler) */
+/* -------------------------------------------------- */
+
+export async function getSeasonsToActivate() {
+  const today = getTodayDateInRiyadh();
+
+  const { data, error } = await supabaseAdmin
+    .from(TABLE)
+    .select("*")
+    .lte("start_date", today)
+    .gte("end_date", today)
+    .eq("is_active", false);
+
+  if (error) throw error;
+  return data;
+}
+
+export async function activateSeason(id) {
+  const { data, error } = await supabaseAdmin
+    .from(TABLE)
+    .update({ is_active: true })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
 }
