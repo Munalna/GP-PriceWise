@@ -1,3 +1,4 @@
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -15,10 +16,14 @@ import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 // Middleware
 import { errorHandler } from "./middleware/errorHandler.js";
 
-dotenv.config();
+import dotenv from 'dotenv';
+import app from './server.js';
 
-const app = express();
+
+dotenv.config();
+console.log("SUPABASE_URL =", process.env.SUPABASE_URL)
 const PORT = process.env.PORT || 3000;
+
 
 /* -------------------------------------------------- */
 /* Core Middleware */
@@ -75,6 +80,8 @@ startSeasonScheduler();
 /* Start Server */
 /* -------------------------------------------------- */
 
+
+
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

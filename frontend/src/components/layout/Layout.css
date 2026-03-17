@@ -104,6 +104,55 @@
   border-color: #5a5d61 !important;
 }
 
+.btn-danger {
+  background-color: #c0392b !important;
+  border-color: #c0392b !important;
+}
+
+.btn-danger:hover {
+  background-color: #a93226 !important;
+  border-color: #a93226 !important;
+}
+
+.btn-outline-primary {
+  color: #7B4B94 !important;
+  border-color: #7B4B94 !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+  background-color: #7B4B94 !important;
+  border-color: #7B4B94 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-secondary {
+  color: #6f7478 !important;
+  border-color: #6f7478 !important;
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
+  background-color: #6f7478 !important;
+  border-color: #6f7478 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-danger {
+  color: #c0392b !important;
+  border-color: #c0392b !important;
+}
+
+.btn-outline-danger:hover,
+.btn-outline-danger:focus,
+.btn-outline-danger:active {
+  background-color: #c0392b !important;
+  border-color: #c0392b !important;
+  color: #ffffff !important;
+}
+
 /* Page headers */
 .page-title {
   color: #6f7478ff;
@@ -230,6 +279,11 @@
   box-shadow: 0 0 0 0.2rem rgba(56, 35, 114, 0.25);
 }
 
+.no-native-reveal::-ms-reveal,
+.no-native-reveal::-ms-clear {
+  display: none;
+}
+
 .signup-label {
   font-weight: 600;
   color: #2d3748;
@@ -279,6 +333,7 @@
     padding: 30px 25px;
   }
 }
+
 /* ===== Seasons chips + actions ===== */
 .pw-chips{
   display: flex;
@@ -316,3 +371,4 @@
 
 .pw-action-btn:hover{ filter: brightness(.95); }
 /* ===== Seasons chips + actions ===== */
+
