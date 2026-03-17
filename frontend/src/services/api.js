@@ -1,19 +1,27 @@
-import axios from 'axios';
+import axios from "axios";
+import { supabase } from "../client"; // use ONE canonical Supabase client path
 
-// Remove the baseURL - proxy will handle it
 const api = axios.create({
-  baseURL: '/api',  // Changed from 'http://localhost:3000/api'
+  baseURL: "/api",
   headers: {
-    'Content-Type': 'application/json'
-  }
+    "Content-Type": "application/json",
+  },
 });
 
-export const productAPI = {
-  getAll: () => api.get('/products'),
-  getById: (id) => api.get(`/products/${id}`),
-  create: (data) => api.post('/products', data),
-  update: (id, data) => api.put(`/products/${id}`, data),
-  delete: (id) => api.delete(`/products/${id}`)
-};
+api.interceptors.request.use(async (config) => {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    return Promise.reject(error);
+  }
+
+  const token = data?.session?.access_token;
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
 
 export default api;

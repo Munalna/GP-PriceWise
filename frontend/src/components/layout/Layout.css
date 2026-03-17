@@ -153,12 +153,16 @@
 }
 /* ==================== SIGNUP PAGE STYLES ==================== */
 
+/* ==================== SIGNUP PAGE STYLES ==================== */
+
 .signup-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
+  justify-content: center;
   background: #f6eefa; 
   font-family: system-ui, -apple-system, sans-serif;
+  padding: 20px;
 }
 
 .signup-card {
