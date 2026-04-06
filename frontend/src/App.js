@@ -12,6 +12,8 @@ import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Costs from './pages/Costs';
 import Seasons from './pages/Seasons';
+import Reports from './pages/Reports';
+import Analytics from './pages/Analytics';
 
 function App() {
   const [token, setToken] = useState(() => {
@@ -33,7 +35,6 @@ function App() {
 
         <Route path="/login" element={<Login setToken={setToken} />} />
         <Route path="/signup" element={<Signup />} />
-
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -48,6 +49,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/products"
           element={
@@ -58,6 +60,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/costs"
           element={
@@ -68,6 +71,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/seasons"
           element={
@@ -79,19 +83,29 @@ function App() {
           }
         />
 
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Reports />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Analytics />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/login" replace />} />
-
-          <Route path="/verify-email" element={<VerifyEmail />} />  {/* ← ADD THIS */}
-
-        
-        {/* Redirect root to signup */}
-        <Route path="/" element={<Navigate to="/signup" />} />
-        
-        {/* Protected Routes (With Layout) */}
-        <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
-        <Route path="/products" element={<MainLayout><Products /></MainLayout>} />
-        <Route path="/costs" element={<MainLayout><Costs /></MainLayout>} />
-      <Route path="/seasons" element={<Seasons />} /> 
       </Routes>
     </Router>
   );

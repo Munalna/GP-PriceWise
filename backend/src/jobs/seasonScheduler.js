@@ -8,7 +8,7 @@ export function startSeasonScheduler() {
   console.log("Season scheduler started");
 
   cron.schedule(
-    "* * * * *", // كل دقيقة للاختبار
+    "5 0 * * *",
     async () => {
       try {
         console.log("Checking seasons to activate...");
@@ -48,7 +48,11 @@ export function startSeasonScheduler() {
 
             console.log(`Season activated: ${activatedSeason.season_name}`);
           } catch (seasonError) {
-            console.error("Error processing season:", season.season_name, seasonError);
+            console.error(
+              "Error processing season:",
+              season.season_name,
+              seasonError
+            );
           }
         }
       } catch (error) {

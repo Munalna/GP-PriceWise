@@ -1,14 +1,15 @@
-
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+
 
 // Routes
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import seasonRoutes from "./routes/seasonRoutes.js";
-// إذا سويتِ notification routes بعدين، فكّي التعليق:
-// import notificationRoutes from "./routes/notificationRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";      // ✅ جديد
+import analyticsRoutes from "./routes/analyticsRoutes.js"; // ✅ جديد
+import salesDataRoutes from "./routes/salesDataRoutes.js";
 
 // Jobs
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
@@ -16,14 +17,12 @@ import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 // Middleware
 import { errorHandler } from "./middleware/errorHandler.js";
 
-import dotenv from 'dotenv';
-import app from './server.js';
-
-
 dotenv.config();
-console.log("SUPABASE_URL =", process.env.SUPABASE_URL)
+
+const app = express(); // ✅ هذا المهم
 const PORT = process.env.PORT || 3000;
 
+console.log("SUPABASE_URL =", process.env.SUPABASE_URL);
 
 /* -------------------------------------------------- */
 /* Core Middleware */
@@ -50,9 +49,9 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/seasons", seasonRoutes);
-
-// إذا أضفتِ notification routes بعدين، فكّي التعليق:
-// app.use("/api/notifications", notificationRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/sales-data", salesDataRoutes);
 
 /* -------------------------------------------------- */
 /* 404 Handler */
@@ -79,8 +78,6 @@ startSeasonScheduler();
 /* -------------------------------------------------- */
 /* Start Server */
 /* -------------------------------------------------- */
-
-
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
