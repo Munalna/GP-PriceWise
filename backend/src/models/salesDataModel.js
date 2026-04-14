@@ -2,16 +2,13 @@ import { supabaseAdmin } from "../config/supabase.js";
 
 const TABLE = "sales_data";
 
-export async function insertSalesData(userId, payload) {
-  const row = {
-    user_id: userId,
-    data: payload.data ?? [],
-    visual_summary: payload.visual_summary ?? {},
-  };
+export async function upsertSalesData(userId, parsedRows) {
+  // Remove old record for this user first, then insert fresh
+  await supabaseAdmin.from(TABLE).delete().eq("user_id", userId);
 
   const { data, error } = await supabaseAdmin
     .from(TABLE)
-    .insert([row])
+    .insert([{ user_id: userId, data: parsedRows }])
     .select("*")
     .single();
 

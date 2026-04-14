@@ -1,29 +1,57 @@
-import { getLatestSalesDataByUser, logExportReport } from "../models/reportModel.js";
+import {
+  getLatestSalesDataByUser,
+  getProductsByUser,
+  logExportReport,
+} from "../models/reportModel.js";
 import { buildDailyReportPdf } from "../services/pdfService.js";
 
-function normalizeReportRows(rawData) {
-  if (!Array.isArray(rawData)) return [];
+function mergeReportData(dbProducts, importedRows) {
+  // Build a lookup map from imported data keyed by lowercase name
+  const importedMap = {};
+  if (Array.isArray(importedRows)) {
+    importedRows.forEach((row) => {
+      const key = row.name?.trim().toLowerCase();
+      if (key) importedMap[key] = row;
+    });
+  }
 
-  return rawData.map((item) => ({
-    product_name: item?.name ?? "",
-    cost: item?.cost ?? 0,
-    competitor_price: item?.competitor_price ?? 0,
-    recommended_price: item?.recommended_price ?? 0,
-  }));
+  // Start with DB products as the base
+  const dbMap = {};
+  dbProducts.forEach((prod) => {
+    const key = prod.name?.trim().toLowerCase();
+    if (key) dbMap[key] = prod;
+  });
+
+  // Merge: DB products enriched with imported recommended_price
+  // Then add any imported products not in DB
+  const allKeys = new Set([...Object.keys(dbMap), ...Object.keys(importedMap)]);
+
+  return Array.from(allKeys).map((key) => {
+    const db = dbMap[key];
+    const imp = importedMap[key];
+
+    return {
+      product_name: db?.name ?? imp?.name ?? key,
+      cost: db?.cost ?? imp?.cost ?? 0,
+      competitor_price: db?.competitor_price ?? imp?.competitor_price ?? 0,
+      recommended_price: db?.recommended_price ?? imp?.recommended_price ?? 0,
+    };
+  });
 }
 
 export async function getDailyReport(req, res, next) {
   try {
     const userId = req.user.id;
 
-    const salesRecord = await getLatestSalesDataByUser(userId);
+    const [salesRecord, dbProducts] = await Promise.all([
+      getLatestSalesDataByUser(userId),
+      getProductsByUser(userId),
+    ]);
 
-    if (!salesRecord) {
-      return res.json([]);
-    }
+    const importedRows = salesRecord?.data ?? [];
+    const merged = mergeReportData(dbProducts, importedRows);
 
-    const reportRows = normalizeReportRows(salesRecord.data);
-    res.json(reportRows);
+    res.json(merged);
   } catch (error) {
     next(error);
   }
@@ -33,19 +61,17 @@ export async function exportDailyReportPdf(req, res, next) {
   try {
     const userId = req.user.id;
 
-    const salesRecord = await getLatestSalesDataByUser(userId);
+    const [salesRecord, dbProducts] = await Promise.all([
+      getLatestSalesDataByUser(userId),
+      getProductsByUser(userId),
+    ]);
 
-    if (!salesRecord) {
-      return res.status(404).json({
-        message: "No sales data found for report export",
-      });
-    }
-
-    const reportRows = normalizeReportRows(salesRecord.data);
+    const importedRows = salesRecord?.data ?? [];
+    const merged = mergeReportData(dbProducts, importedRows);
 
     await logExportReport(userId, "pdf");
 
-    buildDailyReportPdf(reportRows, res);
+    buildDailyReportPdf(merged, res);
   } catch (error) {
     next(error);
   }

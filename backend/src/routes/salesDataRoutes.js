@@ -4,6 +4,8 @@ import protect from "../middleware/authMiddleware.js";
 import { importSalesData } from "../controllers/salesDataController.js";
 
 const router = express.Router();
+
+// Remove fileFilter — validate extension in the controller instead
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/import", protect, upload.single("file"), importSalesData);
