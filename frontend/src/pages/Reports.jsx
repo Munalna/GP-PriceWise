@@ -93,13 +93,13 @@ export default function Reports() {
             {exporting ? "Exporting..." : "Export Report (PDF)"}
           </button>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: "none" }}
-            onChange={handleImportFile}
-          />
+<input
+  ref={fileInputRef}
+  type="file"
+  accept=".xlsx,.xls"
+  style={{ display: "none" }}
+  onChange={handleImportFile}
+/>
         </div>
       </div>
 

@@ -1,3 +1,6 @@
 import { Resend } from "resend";
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
+// TODO: Add RESEND_API_KEY to .env to enable emails (sign up at resend.com)
+export const resend = process.env.RESEND_API_KEY 
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
