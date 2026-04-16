@@ -14,6 +14,7 @@ import Costs from './pages/Costs';
 import Seasons from './pages/Seasons';
 import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
+import PricingRules from './pages/PricingRules';
 
 function App() {
   const [token, setToken] = useState(() => {
@@ -78,6 +79,17 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Seasons />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/pricing-rules"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <PricingRules />
               </MainLayout>
             </ProtectedRoute>
           }
