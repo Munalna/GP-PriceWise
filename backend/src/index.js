@@ -10,6 +10,7 @@ import seasonRoutes from "./routes/seasonRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";      // ✅ جديد
 import analyticsRoutes from "./routes/analyticsRoutes.js"; // ✅ جديد
 import salesDataRoutes from "./routes/salesDataRoutes.js";
+import pricingRuleRoutes from './routes/pricingRuleRoutes.js';
 
 // Jobs
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
@@ -52,6 +53,7 @@ app.use("/api/seasons", seasonRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sales-data", salesDataRoutes);
+app.use("/api/pricing-rules", pricingRuleRoutes);
 
 /* -------------------------------------------------- */
 /* 404 Handler */

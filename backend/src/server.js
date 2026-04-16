@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 import productRoutes from './routes/productRoutes.js';
 import authRoutes from './routes/auth.js';
+import pricingRuleRoutes from './routes/pricingRuleRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
