@@ -1,4 +1,6 @@
 import express from "express";
+import protect from "../middleware/authMiddleware.js";
+
 import {
   getUserPricingRules,
   addPricingRule,
@@ -8,24 +10,28 @@ import {
 
 const router = express.Router();
 
-// Middleware to check for user-id in headers
-router.use((req, res, next) => {
-  const userId = req.headers["user-id"];
+/*
+GET /api/pricing-rules
+Get all pricing rules for logged-in user
+*/
+router.get("/", protect, getUserPricingRules);
 
-  if (!userId) {
-    return res.status(401).json({
-      error: "Unauthorized: No user ID provided in headers",
-    });
-  }
+/*
+POST /api/pricing-rules
+Create new pricing rule
+*/
+router.post("/", protect, addPricingRule);
 
-  req.userId = userId;
-  next();
-});
+/*
+PATCH /api/pricing-rules/:id
+Update pricing rule
+*/
+router.patch("/:id", protect, editPricingRule);
 
-// Routes
-router.get("/", getUserPricingRules);
-router.post("/", addPricingRule);
-router.put("/:id", editPricingRule);
-router.delete("/:id", removePricingRule);
+/*
+DELETE /api/pricing-rules/:id
+Delete pricing rule
+*/
+router.delete("/:id", protect, removePricingRule);
 
 export default router;

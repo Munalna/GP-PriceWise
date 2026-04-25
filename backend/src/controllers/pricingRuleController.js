@@ -7,10 +7,6 @@ import {
   deletePricingRule,
 } from "../models/pricingRuleModel.js";
 
-/* -------------------------------------------------- */
-/* Helpers */
-/* -------------------------------------------------- */
-
 const ALLOWED_RULE_TYPES = [
   "minimum margin",
   "maximum price",
@@ -31,13 +27,9 @@ function parseRuleValue(value) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-/* -------------------------------------------------- */
-/* Controllers */
-/* -------------------------------------------------- */
-
 export async function getUserPricingRules(req, res, next) {
   try {
-    const userId = req.userId;
+    const userId = req.user.id;
     const rules = await getPricingRulesByUser(userId);
     res.json(rules);
   } catch (e) {
@@ -59,7 +51,7 @@ export async function addPricingRule(req, res, next) {
 
     if (!isValidRuleType(type)) {
       return res.status(400).json({
-       message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(", ")}`,
+        message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(", ")}`,
       });
     }
 
@@ -76,7 +68,7 @@ export async function addPricingRule(req, res, next) {
       });
     }
 
-    const userId = req.userId;
+    const userId = req.user.id;
 
     const existing = await getPricingRuleByName(userId, name.trim());
     if (existing) {
@@ -111,7 +103,7 @@ export async function editPricingRule(req, res, next) {
       });
     }
 
-    const userId = req.userId;
+    const userId = req.user.id;
 
     const currentRule = await getPricingRuleById(userId, id);
     if (!currentRule) {
@@ -169,7 +161,7 @@ export async function editPricingRule(req, res, next) {
 export async function removePricingRule(req, res, next) {
   try {
     const { id } = req.params;
-    const userId = req.userId;
+    const userId = req.user.id;
 
     const deleted = await deletePricingRule(userId, id);
 
