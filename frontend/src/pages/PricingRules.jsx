@@ -14,10 +14,6 @@ export default function PricingRules() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const savedToken = localStorage.getItem("supabase_token");
-  const parsedToken = savedToken ? JSON.parse(savedToken) : null;
-  const userId = parsedToken?.user?.id || parsedToken?.id || null;
-
   const normalize = (row) => ({
     id: row?.id,
     name: row?.name ?? "",
@@ -30,24 +26,24 @@ export default function PricingRules() {
     setError("");
     setLoading(true);
     try {
-      const data = await getPricingRules(userId);
+      const data = await getPricingRules();
       const arr = Array.isArray(data) ? data : [];
       setRules(arr.map(normalize));
     } catch (e) {
-      setError(e?.response?.data?.message || e?.response?.data?.error || e.message || "Failed to load pricing rules");
+      setError(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e.message ||
+          "Failed to load pricing rules"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!userId) {
-      setError("No userId found. Please login again.");
-      setLoading(false);
-      return;
-    }
     load();
-  }, [userId]);
+  }, []);
 
   const sortedRules = useMemo(() => {
     return [...rules].sort((a, b) => {
@@ -68,10 +64,10 @@ export default function PricingRules() {
   const onSave = async ({ name, type, value }) => {
     try {
       if (!editing) {
-        const created = await createPricingRule(userId, { name, type, value });
+        const created = await createPricingRule({ name, type, value });
         setRules((prev) => [normalize(created), ...prev]);
       } else {
-        const updated = await updatePricingRule(userId, editing.id, { name, type, value });
+        const updated = await updatePricingRule(editing.id, { name, type, value });
         setRules((prev) =>
           prev.map((x) => (x.id === editing.id ? normalize(updated) : x))
         );
@@ -91,7 +87,7 @@ export default function PricingRules() {
   const onDelete = async (id) => {
     if (!window.confirm("Delete this pricing rule?")) return;
     try {
-      await deletePricingRule(userId, id);
+      await deletePricingRule(id);
       setRules((prev) => prev.filter((x) => x.id !== id));
     } catch (e) {
       alert(
@@ -193,9 +189,7 @@ export default function PricingRules() {
 
       {showModal && (
         <PricingRuleModal
-          initial={
-            editing || { name: "", type: "profit margin", value: "" }
-          }
+          initial={editing || { name: "", type: "profit margin", value: "" }}
           onClose={() => {
             setShowModal(false);
             setEditing(null);
