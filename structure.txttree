@@ -1,0 +1,121 @@
+.
+├── backend
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md
+│   └── src
+│       ├── config
+│       │   ├── resend.js
+│       │   └── supabase.js
+│       ├── controllers
+│       │   ├── analyticsController.js
+│       │   ├── authController.js
+│       │   ├── costController.js
+│       │   ├── pricingRuleController.js
+│       │   ├── productController.js
+│       │   ├── reportController.js
+│       │   ├── salesDataController.js
+│       │   └── seasonController.js
+│       ├── index.js
+│       ├── index.old.js
+│       ├── jobs
+│       │   └── seasonScheduler.js
+│       ├── middleware
+│       │   ├── authMiddleware.js
+│       │   └── errorHandler.js
+│       ├── models
+│       │   ├── analyticsModel.js
+│       │   ├── costModel.js
+│       │   ├── notificationModel.js
+│       │   ├── pricingRuleModel.js
+│       │   ├── productModel.js
+│       │   ├── reportModel.js
+│       │   ├── salesDataModel.js
+│       │   ├── seasonModel.js
+│       │   └── userModel.js
+│       ├── routes
+│       │   ├── analyticsRoutes.js
+│       │   ├── auth.js
+│       │   ├── authRoutes.js
+│       │   ├── costRoutes.js
+│       │   ├── pricingRuleRoutes.js
+│       │   ├── productRoutes.js
+│       │   ├── reportRoutes.js
+│       │   ├── salesDataRoutes.js
+│       │   └── seasonRoutes.js
+│       ├── server.js
+│       ├── services
+│       │   ├── aiPricingService.js
+│       │   ├── pdfService.js
+│       │   └── riskAnalysisService.js
+│       └── utils
+│           └── emailService.js
+├── frontend
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   ├── PriceWiseLOGO.PNG
+│   │   ├── robots.txt
+│   │   └── vite.svg
+│   ├── README.md
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.js
+│   │   ├── App.jsx
+│   │   ├── App.test.js
+│   │   ├── assets
+│   │   │   └── react.svg
+│   │   ├── client.js
+│   │   ├── components
+│   │   │   ├── analytics
+│   │   │   ├── auth
+│   │   │   ├── common
+│   │   │   ├── cost
+│   │   │   ├── layout
+│   │   │   └── products
+│   │   ├── config
+│   │   │   └── supabase.js
+│   │   ├── context
+│   │   │   └── AuthContext.jsx
+│   │   ├── index.css
+│   │   ├── index.js
+│   │   ├── logo.svg
+│   │   ├── main.jsx
+│   │   ├── pages
+│   │   │   ├── Analytics.jsx
+│   │   │   ├── Costs.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── ForgotPassword.jsx
+│   │   │   ├── Login.jsx
+│   │   │   ├── PricingRules.jsx
+│   │   │   ├── Products.jsx
+│   │   │   ├── Reports.jsx
+│   │   │   ├── ResetPassword.jsx
+│   │   │   ├── Seasons.jsx
+│   │   │   ├── Signup.jsx
+│   │   │   └── VerifyEmail.jsx
+│   │   ├── reportWebVitals.js
+│   │   ├── services
+│   │   │   ├── analyticsService.js
+│   │   │   ├── api.js
+│   │   │   ├── authService.js
+│   │   │   ├── costService.js
+│   │   │   ├── pricingRuleService.js
+│   │   │   ├── productService.js
+│   │   │   ├── reportService.js
+│   │   │   └── seasonService.js
+│   │   ├── setupTests.js
+│   │   └── supabaseClient.js
+│   └── vite.config.js
+├── README.md
+├── structure.txt
+└── structure.txttree
+
+26 directories, 93 files
