@@ -81,6 +81,8 @@
   padding: 30px;
   min-height: 100vh;
   background-color: #f8f9fa;
+   flex: 1;          
+  min-width: 0;
 }
 
 /* Custom button colors */
