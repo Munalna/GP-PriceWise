@@ -4,6 +4,8 @@ import {
   createSeason,
   updateSeason,
   deleteSeason,
+  fetchPricingRules,
+  assignSeasonRules,
 } from "../services/seasonService";
 
 export default function Seasons() {
@@ -14,17 +16,24 @@ export default function Seasons() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  const [pricingRules, setPricingRules] = useState([]);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState(null);
+  const [tempSelectedRules, setTempSelectedRules] = useState([]);
+
   const normalize = (row) => ({
     id: row?.id,
     name: row?.season_name ?? "",
     startDate: row?.start_date ?? "",
     endDate: row?.end_date ?? "",
     active: row?.is_active ?? false,
+    rules: row?.rules || [],
   });
 
   const load = async () => {
     setError("");
     setLoading(true);
+
     try {
       const data = await fetchSeasons();
       const arr = Array.isArray(data) ? data : [];
@@ -36,8 +45,18 @@ export default function Seasons() {
     }
   };
 
+  const loadRules = async () => {
+    try {
+      const data = await fetchPricingRules();
+      setPricingRules(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Failed to load pricing rules:", e);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadRules();
   }, []);
 
   const sortedSeasons = useMemo(() => {
@@ -58,17 +77,41 @@ export default function Seasons() {
     setShowModal(true);
   };
 
+  const openRulesModal = (season) => {
+    setSelectedSeason(season);
+    setTempSelectedRules((season.rules || []).map((rule) => rule.id));
+    setShowRulesModal(true);
+  };
+
+  const saveSeasonRules = async () => {
+    try {
+      await assignSeasonRules(selectedSeason.id, tempSelectedRules);
+      await load();
+      setShowRulesModal(false);
+      setSelectedSeason(null);
+      alert("Season pricing rules assigned successfully.");
+    } catch (e) {
+      alert(e.message || "Failed to assign rules");
+    }
+  };
+
   const onSave = async ({ name, startDate, endDate }) => {
     try {
       if (!editing) {
         const created = await createSeason({ name, startDate, endDate });
         setSeasons((prev) => [...prev, normalize(created)]);
       } else {
-        const updated = await updateSeason(editing.id, { name, startDate, endDate });
+        const updated = await updateSeason(editing.id, {
+          name,
+          startDate,
+          endDate,
+        });
+
         setSeasons((prev) =>
           prev.map((x) => (x.id === editing.id ? normalize(updated) : x))
         );
       }
+
       setShowModal(false);
       setEditing(null);
     } catch (e) {
@@ -78,6 +121,7 @@ export default function Seasons() {
 
   const onDelete = async (id) => {
     if (!window.confirm("Delete this season?")) return;
+
     try {
       await deleteSeason(id);
       setSeasons((prev) => prev.filter((x) => x.id !== id));
@@ -92,7 +136,7 @@ export default function Seasons() {
         <div>
           <h2 style={styles.title}>Seasons</h2>
           <p style={styles.subtitle}>
-            Manage seasonal periods (name, dates, status).
+            Manage seasonal periods, pricing rules, dates, and status.
           </p>
         </div>
 
@@ -124,6 +168,9 @@ export default function Seasons() {
                   <th style={styles.th}>Season Name</th>
                   <th style={styles.th}>Start Date</th>
                   <th style={styles.th}>End Date</th>
+                  <th style={{ ...styles.th, textAlign: "center" }}>
+                    Pricing Rules
+                  </th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Status</th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Actions</th>
                 </tr>
@@ -132,7 +179,7 @@ export default function Seasons() {
               <tbody>
                 {sortedSeasons.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={styles.emptyCell}>
+                    <td colSpan={6} style={styles.emptyCell}>
                       No seasons yet. Click <b>Create Season</b>.
                     </td>
                   </tr>
@@ -142,6 +189,21 @@ export default function Seasons() {
                       <td style={styles.tdName}>{s.name || "-"}</td>
                       <td style={styles.td}>{s.startDate || "-"}</td>
                       <td style={styles.td}>{s.endDate || "-"}</td>
+
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        <div style={styles.ruleBadges}>
+                          {(s.rules || []).length > 0 ? (
+                            s.rules.map((rule) => (
+                              <span key={rule.id} style={styles.ruleBadge}>
+                                {rule.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span style={styles.noRules}>No rules</span>
+                          )}
+                        </div>
+                      </td>
+
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <span
                           style={{
@@ -152,15 +214,32 @@ export default function Seasons() {
                           {s.active ? "Active" : "Inactive"}
                         </span>
                       </td>
+
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
-                          <button style={styles.iconBtn} onClick={() => openEdit(s)} type="button">
+                          <button
+                            style={{ ...styles.iconBtn, background: "#382372" }}
+                            onClick={() => openRulesModal(s)}
+                            type="button"
+                            title="Assign Rules"
+                          >
+                            🔗
+                          </button>
+
+                          <button
+                            style={styles.iconBtn}
+                            onClick={() => openEdit(s)}
+                            type="button"
+                            title="Edit Season"
+                          >
                             ✏️
                           </button>
+
                           <button
                             style={{ ...styles.iconBtn, background: "#ef4444" }}
                             onClick={() => onDelete(s.id)}
                             type="button"
+                            title="Delete Season"
                           >
                             🗑️
                           </button>
@@ -185,6 +264,74 @@ export default function Seasons() {
           onSave={onSave}
         />
       )}
+
+      {showRulesModal && selectedSeason && (
+        <div style={styles.overlay}>
+          <div style={styles.modal}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0 }}>
+                Assign Rules to {selectedSeason.name}
+              </h3>
+              <button
+                style={styles.closeBtn}
+                onClick={() => setShowRulesModal(false)}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={styles.rulesList}>
+              {pricingRules.length > 0 ? (
+                pricingRules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    style={styles.ruleOption}
+                    onClick={() => {
+                      setTempSelectedRules((prev) =>
+                        prev.includes(rule.id)
+                          ? prev.filter((id) => id !== rule.id)
+                          : [...prev, rule.id]
+                      );
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={tempSelectedRules.includes(rule.id)}
+                      readOnly
+                    />
+                    <div>
+                      <div style={{ fontWeight: 900 }}>{rule.name}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {rule.type} - {rule.value}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{ color: "#6b7280" }}>No pricing rules found.</p>
+              )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button
+                style={styles.secondaryBtn}
+                onClick={() => setShowRulesModal(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.primaryBtn}
+                onClick={saveSeasonRules}
+                type="button"
+              >
+                Assign Rules
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -198,9 +345,11 @@ function SeasonModal({ initial, onClose, onSave }) {
     if (!name.trim()) return alert("Season name required");
     if (!startDate) return alert("Start date required");
     if (!endDate) return alert("End date required");
+
     if (new Date(endDate) < new Date(startDate)) {
       return alert("End date must be after start date");
     }
+
     onSave({ name: name.trim(), startDate, endDate });
   };
 
@@ -217,8 +366,11 @@ function SeasonModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Season Name</label>
+          <label style={styles.label}>
+            Season Name <span style={styles.requiredStar}>*</span>
+          </label>
           <input
+            required
             style={styles.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -228,17 +380,24 @@ function SeasonModal({ initial, onClose, onSave }) {
 
         <div style={styles.grid2}>
           <div style={styles.field}>
-            <label style={styles.label}>Start Date</label>
+            <label style={styles.label}>
+              Start Date <span style={styles.requiredStar}>*</span>
+            </label>
             <input
+              required
               style={styles.input}
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
+
           <div style={styles.field}>
-            <label style={styles.label}>End Date</label>
+            <label style={styles.label}>
+              End Date <span style={styles.requiredStar}>*</span>
+            </label>
             <input
+              required
               style={styles.input}
               type="date"
               value={endDate}
@@ -261,7 +420,7 @@ function SeasonModal({ initial, onClose, onSave }) {
 }
 
 const styles = {
-  page: { padding: 22, maxWidth: 1100 },
+  page: { padding: 22, maxWidth: 1200 },
   headerRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -320,6 +479,26 @@ const styles = {
     fontWeight: 900,
     fontSize: 12,
     minWidth: 86,
+  },
+
+  ruleBadges: {
+    display: "flex",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  ruleBadge: {
+    background: "#ede9fe",
+    color: "#382372",
+    padding: "5px 9px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  noRules: {
+    color: "#9ca3af",
+    fontSize: 13,
+    fontStyle: "italic",
   },
 
   actions: { display: "flex", justifyContent: "center", gap: 10 },
@@ -387,6 +566,23 @@ const styles = {
     fontWeight: 900,
   },
 
+  rulesList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginTop: 12,
+  },
+  ruleOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    cursor: "pointer",
+    background: "#fff",
+  },
+
   field: { display: "flex", flexDirection: "column", gap: 8, marginTop: 10 },
   label: { fontSize: 13, fontWeight: 900, color: "#374151" },
   input: {
@@ -405,7 +601,12 @@ const styles = {
     marginTop: 16,
   },
 
-  loadingRow: { display: "flex", alignItems: "center", gap: 10, color: "#475569" },
+  loadingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    color: "#475569",
+  },
   spinner: {
     width: 16,
     height: 16,
@@ -436,5 +637,10 @@ const styles = {
     cursor: "pointer",
     fontWeight: 900,
     whiteSpace: "nowrap",
+  },
+
+  requiredStar: {
+    color: "#e74c3c",
+    fontWeight: "bold",
   },
 };

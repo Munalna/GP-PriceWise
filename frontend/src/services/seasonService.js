@@ -29,3 +29,13 @@ export async function deleteSeason(id) {
   const res = await api.delete(`/seasons/${id}`);
   return res.data;
 }
+
+export async function fetchPricingRules() {
+  const res = await api.get("/pricing-rules");
+  return res.data;
+}
+
+export async function assignSeasonRules(seasonId, rules) {
+  const res = await api.put(`/seasons/${seasonId}/rules`, { rules });
+  return res.data;
+}

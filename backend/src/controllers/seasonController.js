@@ -3,6 +3,7 @@ import {
   createSeason,
   updateSeason,
   deleteSeason,
+  assignPricingRulesToSeason,
 } from "../models/seasonModel.js";
 
 export async function getUserSeasons(req, res, next) {
@@ -10,6 +11,24 @@ export async function getUserSeasons(req, res, next) {
     const userId = req.user.id;
     const seasons = await getSeasonsByUser(userId);
     res.json(seasons);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function assignSeasonRules(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { rules } = req.body;
+
+    const result = await assignPricingRulesToSeason(userId, id, rules);
+
+    res.json({
+      success: true,
+      message: "Season pricing rules assigned successfully.",
+      data: result,
+    });
   } catch (e) {
     next(e);
   }

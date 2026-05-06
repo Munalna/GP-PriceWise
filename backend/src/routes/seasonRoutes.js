@@ -6,6 +6,7 @@ import {
   addSeason,
   editSeason,
   removeSeason,
+  assignSeasonRules,
 } from "../controllers/seasonController.js";
 
 const router = express.Router();
@@ -22,6 +23,8 @@ Create new season
 */
 router.post("/", protect, addSeason);
 
+
+router.put("/:id/rules", protect, assignSeasonRules);
 /*
 PATCH /api/seasons/:id
 Update season
