@@ -7,6 +7,29 @@ const MARKET_TABLE = "marketdataset";
 const PRICING_RULE_ASSIGNMENTS_TABLE = "pricing_rule_assignments";
 const SEASONS_TABLE = "seasons";
 
+export async function checkProductInMarketDataset(productName) {
+  const db = getDbClient();
+
+  const normalizedName = productName.trim().toLowerCase();
+
+  const { data, error } = await db
+    .from("marketdataset")
+    .select("itemname, price")
+    .limit(100);
+
+  if (error) throw error;
+
+  const matches = (data || []).filter((row) => {
+    const itemName = String(row.itemname || "").trim().toLowerCase();
+    return itemName === normalizedName;
+  });
+
+  return {
+    exists: matches.length > 0,
+    matches,
+  };
+}
+
 function getDbClient() {
   if (!supabaseAdmin) {
     throw new Error("Supabase admin client is not configured.");

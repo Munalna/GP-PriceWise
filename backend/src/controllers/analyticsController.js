@@ -2,6 +2,7 @@ import {
   getLatestVisualSummaryByUser,
   buildProductPricingAnalysisInput,
   buildAllProductsPricingAnalysisInput,
+  checkProductInMarketDataset,
 } from "../models/analyticsModel.js";
 
 import {
@@ -11,6 +12,8 @@ import {
 } from "../services/riskAnalysisService.js";
 
 import { generateAIPriceRecommendation } from "../services/aiPricingService.js";
+
+import { updateRecommendedPriceById } from "../models/productModel.js";
 
 export async function getAnalytics(req, res, next) {
   try {
@@ -38,6 +41,29 @@ export async function getAnalytics(req, res, next) {
   }
 }
 
+export async function checkMarketProduct(req, res, next) {
+  try {
+    const { name } = req.query;
+
+    if (!name || name.trim().length < 2) {
+      return res.json({
+        success: true,
+        exists: false,
+        matches: [],
+      });
+    }
+
+    const result = await checkProductInMarketDataset(name.trim());
+
+    return res.json({
+      success: true,
+      exists: result.exists,
+      matches: result.matches,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 export async function analyzeSingleProduct(req, res, next) {
   try {
     const userId = req.user.id;
@@ -107,6 +133,26 @@ export async function getPricingRiskSummary(req, res, next) {
   }
 }
 
+function buildFallbackRecommendedPrice(productInput) {
+  const baseCost = Number(productInput.base_cost) || 0;
+  const competitorAverage = Number(productInput.competitor_average_price) || 0;
+  const currentPrice = Number(productInput.current_price) || 0;
+
+  let recommendedPrice;
+
+  if (baseCost > 0 && competitorAverage > 0) {
+    recommendedPrice = Math.max(baseCost * 1.3, competitorAverage);
+  } else if (baseCost > 0) {
+    recommendedPrice = baseCost * 1.35;
+  } else if (competitorAverage > 0) {
+    recommendedPrice = competitorAverage;
+  } else {
+    recommendedPrice = currentPrice;
+  }
+
+  return Number(recommendedPrice.toFixed(2));
+}
+
 export async function getAIPriceRecommendation(req, res, next) {
   try {
     const userId = req.user.id;
@@ -122,27 +168,38 @@ export async function getAIPriceRecommendation(req, res, next) {
     }
 
     const analysis = await analyzeProductRisk(productInput);
-   let aiRecommendation;
 
-try {
-  aiRecommendation = await generateAIPriceRecommendation(productInput, analysis);
-} catch (aiError) {
-  console.error("Gemini recommendation error:", aiError.message);
+    let aiRecommendation;
 
-  aiRecommendation = {
-    recommended_price:
-      productInput.competitor_average_price > 0
-        ? productInput.competitor_average_price
-        : productInput.current_price,
-    recommendation_type: "maintain",
-    reason:
-      "AI recommendation is currently unavailable due to Gemini quota limits. A fallback recommendation was generated using available pricing data.",
-    risk_explanation: analysis.short_reason,
-    margin_safety_explanation: `Current margin is ${analysis.applied_margin}%.`,
-    action: analysis.recommendation,
-    model: "fallback_rule_based",
-  };
-}
+    try {
+      aiRecommendation = await generateAIPriceRecommendation(productInput, analysis);
+    } catch (aiError) {
+      console.error("Gemini recommendation error:", aiError.message);
+
+      const fallbackRecommendedPrice = buildFallbackRecommendedPrice(productInput);
+
+      aiRecommendation = {
+        recommended_price: fallbackRecommendedPrice,
+        recommendation_type:
+          fallbackRecommendedPrice > productInput.current_price
+            ? "increase"
+            : fallbackRecommendedPrice < productInput.current_price
+            ? "decrease"
+            : "maintain",
+        reason:
+          "Generated using product cost, competitor pricing, and available pricing rules.",
+        risk_explanation: analysis.short_reason,
+        margin_safety_explanation: `Current margin is ${analysis.applied_margin}%.`,
+        action: analysis.recommendation,
+        model: "fallback_rule_based",
+      };
+    }
+
+    await updateRecommendedPriceById(
+  productInput.product_id,
+  userId,
+  aiRecommendation.recommended_price
+);
 
     return res.json({
       success: true,

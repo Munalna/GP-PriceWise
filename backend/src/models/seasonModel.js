@@ -35,14 +35,39 @@ function getTodayDateInRiyadh() {
 /* -------------------------------------------------- */
 
 export async function getSeasonsByUser(userId) {
-  const { data, error } = await supabaseAdmin
+  const { data: seasons, error } = await supabaseAdmin
     .from(TABLE)
     .select("*")
     .eq("user_id", userId)
     .order("start_date", { ascending: true });
 
   if (error) throw error;
-  return data;
+
+  const { data: assignments, error: assignmentError } = await supabaseAdmin
+    .from("pricing_rule_assignments")
+    .select(`
+      id,
+      target_type,
+      target_id,
+      pricing_rules (
+        id,
+        name,
+        type,
+        value
+      )
+    `)
+    .eq("user_id", userId)
+    .eq("target_type", "season");
+
+  if (assignmentError) throw assignmentError;
+
+  return (seasons || []).map((season) => ({
+    ...season,
+    rules: (assignments || [])
+      .filter((a) => String(a.target_id) === String(season.id))
+      .map((a) => a.pricing_rules)
+      .filter(Boolean),
+  }));
 }
 
 export async function createSeason(userId, payload) {
@@ -129,6 +154,32 @@ export async function getSeasonsToActivate() {
 
   if (error) throw error;
   return data;
+}
+
+export async function assignPricingRulesToSeason(userId, seasonId, ruleIds) {
+  await supabaseAdmin
+    .from("pricing_rule_assignments")
+    .delete()
+    .eq("user_id", userId)
+    .eq("target_type", "season")
+    .eq("target_id", seasonId);
+
+  if (!ruleIds || ruleIds.length === 0) return [];
+
+  const rows = ruleIds.map((ruleId) => ({
+    user_id: userId,
+    rule_id: ruleId,
+    target_type: "season",
+    target_id: seasonId,
+  }));
+
+  const { data, error } = await supabaseAdmin
+    .from("pricing_rule_assignments")
+    .insert(rows)
+    .select();
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function activateSeason(id) {

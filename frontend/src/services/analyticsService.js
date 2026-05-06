@@ -23,3 +23,8 @@ export async function getAIPriceRecommendation(productId) {
   );
   return data;
 }
+
+export async function checkMarketProduct(name) {
+  const { data } = await api.get(`/analytics/market-check?name=${encodeURIComponent(name)}`);
+  return data;
+}

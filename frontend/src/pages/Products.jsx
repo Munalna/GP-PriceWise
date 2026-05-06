@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Spinner, Alert } from "react-bootstrap";
 import { supabase } from "../client";
-import { getAIPriceRecommendation } from "../services/analyticsService";
+import api from "../services/api";
+import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
 
 const API_URL = "http://localhost:3000/api/products";
 
@@ -24,6 +25,8 @@ function Products() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [productIdToDelete, setProductIdToDelete] = useState(null);
+  const [marketCheck, setMarketCheck] = useState(null);
+  const [componentSearch, setComponentSearch] = useState("");
 
   const [newProd, setNewProd] = useState({
     name: "",
@@ -36,6 +39,7 @@ function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [pricingRules, setPricingRules] = useState([]);
 
   const calculateAvg = (prices) => {
     if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
@@ -44,6 +48,30 @@ function Products() {
     const sum = validPrices.reduce((acc, val) => acc + val, 0);
     return (sum / validPrices.length).toFixed(2);
   };
+
+ const handleCheckMarketProduct = async (name) => {
+  if (!name || name.trim().length < 2) {
+    setMarketCheck(null);
+    return;
+  }
+
+  try {
+    const result = await checkMarketProduct(name);
+    setMarketCheck(result);
+  } catch (err) {
+    console.error("Market check error:", err);
+  }
+};
+
+const loadPricingRules = useCallback(async () => {
+  try {
+    const { data } = await api.get("/pricing-rules");
+    setPricingRules(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("Error loading pricing rules:", err);
+  }
+}, []);
+
 
   const loadData = useCallback(async () => {
     if (!userId) return;
@@ -89,10 +117,11 @@ function Products() {
   }, []);
 
   useEffect(() => {
-    if (userId) {
-      loadData();
-    }
-  }, [userId, loadData]);
+  if (userId) {
+    loadData();
+    loadPricingRules();
+  }
+}, [userId, loadData, loadPricingRules]);
 
   const calculateTotalVcost = (prodComponents) => {
     if (!prodComponents || !Array.isArray(prodComponents)) return 0;
@@ -104,6 +133,10 @@ function Products() {
       return sum + unitCost * quantity;
     }, 0);
   };
+
+  const filteredComponents = varComponents.filter((comp) =>
+  comp.name.toLowerCase().includes(componentSearch.toLowerCase())
+);
 
   const handleAnalyzePricing = async (productId) => {
   setRiskLoading(true);
@@ -189,9 +222,24 @@ function Products() {
   };
 
   const handleSaveProduct = async () => {
-    if (!newProd.name || !newProd.category_id) {
-      return alert("Please fill Name and Category");
-    }
+
+  if (!newProd.name.trim()) {
+
+    return setError("Product name is required.");
+
+  }
+
+  if (!newProd.category_id) {
+
+    return setError("Category is required.");
+
+  }
+
+  if (!newProd.components || newProd.components.length === 0) {
+
+    return setError("At least one component is required.");
+
+  }
 
     try {
       const res = await fetch(API_URL, {
@@ -217,29 +265,45 @@ function Products() {
     }
   };
 
-  const handleUpdateProduct = async () => {
-    try {
-      const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({
-          ...selectedProduct,
-          components: JSON.stringify(selectedProduct.components),
-          v_cost: calculateTotalVcost(selectedProduct.components).toString(),
-          c_price: selectedProduct.c_price,
-          comp_price: selectedProduct.comp_price,
-          b_cost: selectedProduct.b_cost,
-        }),
-      });
+   const handleUpdateProduct = async () => {
+  if (!selectedProduct.name || !selectedProduct.name.trim()) {
+    return setError("Product name is required.");
+  }
 
-      if (res.ok) {
-        await loadData();
-        setShowEditModal(false);
-      }
-    } catch (err) {
-      setError("Error updating product");
+  if (
+    selectedProduct.c_price === "" ||
+    selectedProduct.c_price === null ||
+    selectedProduct.c_price === undefined
+  ) {
+    return setError("Current price is required.");
+  }
+
+  if (Number(selectedProduct.c_price) < 0) {
+    return setError("Current price cannot be negative.");
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({
+        ...selectedProduct,
+        components: JSON.stringify(selectedProduct.components),
+        v_cost: calculateTotalVcost(selectedProduct.components).toString(),
+        c_price: selectedProduct.c_price,
+        comp_price: selectedProduct.comp_price,
+        b_cost: selectedProduct.b_cost,
+      }),
+    });
+
+    if (res.ok) {
+      await loadData();
+      setShowEditModal(false);
     }
-  };
+  } catch (err) {
+    setError("Error updating product");
+  }
+};
 
   const confirmDelete = async () => {
     if (!productIdToDelete) return;
@@ -278,13 +342,64 @@ function Products() {
       });
 
       if (res.ok) {
-        await loadData();
-        setShowRulesModal(false);
-      }
+  if (selectedProduct) {
+    await handleAnalyzePricing(selectedProduct.id);
+  }
+
+  await loadData();
+  setShowRulesModal(false);
+  alert("Pricing rules assigned successfully.");
+}
     } catch (err) {
       setError("Error saving rules");
     }
   };
+
+  const handleRenameCategory = async (cat) => {
+  const newName = prompt("Enter new category name:", cat.name);
+
+  if (!newName || !newName.trim()) return;
+
+  try {
+    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Error renaming category");
+    }
+
+    await loadData();
+  } catch (err) {
+    setError(err.message);
+  }
+};
+
+const handleDeleteCategory = async (cat) => {
+  const confirmed = window.confirm(`Delete category "${cat.name}"?`);
+
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+      method: "DELETE",
+      headers: { "user-id": userId },
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Error deleting category");
+    }
+
+    await loadData();
+  } catch (err) {
+    setError(err.message);
+  }
+};
 
   const parseComponents = (compData) => {
     if (!compData) return [];
@@ -331,24 +446,43 @@ function Products() {
           ) : (
             categories.map((cat) => (
               <div key={cat.id} style={categoryCard}>
-                <div style={categoryHeader}>
-                  <div>
-                    <h2 style={catTitleText}>{cat.name}</h2>
-                    <div style={badgeRow}>
-                      {(cat.rules || []).map((rule, idx) => (
-                        <span key={idx} style={orangeBadgeSmall}>
-                          {rule}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+  <div style={categoryHeader}>
+    <div>
+      <div style={categoryTitleRow}>
+        <h2 style={catTitleText}>{cat.name}</h2>
+
+        <button
+          style={categoryEditBtn}
+          onClick={() => handleRenameCategory(cat)}
+          title="Rename Category"
+        >
+          ✏️
+        </button>
+
+        <button
+          style={categoryDeleteBtn}
+          onClick={() => handleDeleteCategory(cat)}
+          title="Delete Category"
+        >
+          🗑️
+        </button>
+      </div>
+
+      <div style={badgeRow}>
+        {(cat.rules || []).map((rule, idx) => (
+          <span key={idx} style={orangeBadgeSmall}>
+            {rule.name}
+          </span>
+        ))}
+      </div>
+    </div>
 
                   <button
                     style={btnAssignRules}
                     onClick={() => {
                       setSelectedCategory(cat);
                       setSelectedProduct(null);
-                      setTempSelectedRules(cat.rules || []);
+                      setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
                       setShowRulesModal(true);
                     }}
                   >
@@ -366,7 +500,6 @@ function Products() {
                         <th style={thStyle}>Base Cost</th>
                         <th style={thStyle}>Current Price</th>
                         <th style={thStyle}>Recommended</th>
-                        <th style={thStyle}>Competitor</th>
                         <th style={thStyle}>Avg Competitors Price</th>
                         <th style={thStyle}>Actions</th>
                       </tr>
@@ -381,10 +514,10 @@ function Products() {
                             <td style={tdStyle}>
                               <div style={prodNameText}>{prod.name}</div>
                               {(prod.rules || []).map((r, i) => (
-                                <div key={i} style={blueBadgeSmall}>
-                                  {r}
-                                </div>
-                              ))}
+  <div key={r.id || i} style={blueBadgeSmall}>
+    {r.name}
+  </div>
+))}
                             </td>
 
                             <td style={tdStyle}>
@@ -423,7 +556,7 @@ function Products() {
   ? `${prod.r_price} SAR`
   : "Analyze"}
                             </td>
-                            <td style={tdStyle}>{prod.comp_price} SAR</td>
+                            
                             <td
                               style={{
                                 ...tdStyle,
@@ -453,7 +586,7 @@ function Products() {
                                       components: comps,
                                     });
                                     setSelectedCategory(null);
-                                    setTempSelectedRules(prod.rules || []);
+                                    setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
                                     setShowRulesModal(true);
                                   }}
                                 >
@@ -669,53 +802,122 @@ function Products() {
             <h2 style={modalTitleCustom}>Add New Product</h2>
 
             <div style={inputGroup}>
-              <label style={labelStyle}>Product Name</label>
+              <label style={labelStyle}>
+
+  Product Name <span style={requiredStar}>*</span>
+
+</label>
               <input
-                style={inputFieldCustom}
-                placeholder="Enter name"
-                value={newProd.name}
-                onChange={(e) =>
-                  setNewProd({ ...newProd, name: e.target.value })
-                }
-              />
+  style={inputFieldCustom}
+  placeholder="Enter name"
+  value={newProd.name}
+  onChange={(e) => {
+    const value = e.target.value;
+    setNewProd({ ...newProd, name: value });
+    handleCheckMarketProduct(value);
+  }}
+/>
+
+{marketCheck && (
+  <div
+    style={{
+      color: marketCheck.exists ? "#27ae60" : "#e67e22",
+      fontSize: "13px",
+      fontWeight: "600",
+      marginTop: "-8px",
+      marginBottom: "12px",
+    }}
+  >
+    {marketCheck.exists
+      ? "✅ Market data found for this product."
+      : "⚠️ No market data found. Competitor average may be 0 SAR."}
+  </div>
+)}
             </div>
 
             <div style={inputGroup}>
-              <label style={labelStyle}>Components</label>
-              <div style={compSelectionGrid}>
-                {varComponents.map((comp) => {
-                  const isSelected = newProd.components.find(
-                    (c) => c.name === comp.name
-                  );
+  <label style={labelStyle}>
+  Components <span style={requiredStar}>*</span>
+</label>
 
-                  return (
-                    <div key={comp.id} style={compItemWrapper}>
-                      <div
-                        onClick={() => toggleComponent(comp.name, false)}
-                        style={isSelected ? activeCompBox : inactiveCompBox}
-                      >
-                        {comp.name}
-                      </div>
+  <input
+  style={inputFieldCustom}
+  placeholder="Search component..."
+  value={componentSearch}
+  onChange={(e) => setComponentSearch(e.target.value)}
+/>
 
-                      {isSelected && (
-                        <input
-                          type="number"
-                          min="0"
-                          style={qtyInputSmall}
-                          value={isSelected.qty}
-                          onChange={(e) =>
-                            updateQty(comp.name, e.target.value, false)
-                          }
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+<div style={componentDropdown}>
+  {filteredComponents.length > 0 ? (
+    filteredComponents.map((comp) => (
+      <div
+        key={comp.id}
+        style={componentDropdownItem}
+        onClick={() => {
+          const alreadySelected = newProd.components.find(
+            (c) => c.name === comp.name
+          );
+
+          if (!alreadySelected) {
+            setNewProd({
+              ...newProd,
+              components: [...newProd.components, { name: comp.name, qty: 1 }],
+            });
+          }
+
+          setComponentSearch("");
+        }}
+      >
+        {comp.name}
+      </div>
+    ))
+  ) : (
+    <div style={componentDropdownEmpty}>No component found</div>
+  )}
+</div>
+  
+
+  <div style={selectedComponentsBox}>
+    {newProd.components.length > 0 ? (
+      newProd.components.map((comp) => (
+        <div key={comp.name} style={selectedComponentChip}>
+          <span>{comp.name}</span>
+
+          <input
+            type="number"
+            min="1"
+            style={qtyInputSmall}
+            value={comp.qty}
+            onChange={(e) => updateQty(comp.name, e.target.value, false)}
+          />
+
+          <button
+            style={removeChipBtn}
+            onClick={() =>
+              setNewProd({
+                ...newProd,
+                components: newProd.components.filter(
+                  (c) => c.name !== comp.name
+                ),
+              })
+            }
+          >
+            ×
+          </button>
+        </div>
+      ))
+    ) : (
+      <span style={{ color: "#999", fontSize: "13px" }}>
+        No components selected yet.
+      </span>
+    )}
+  </div>
+</div>
 
             <div style={inputGroup}>
-              <label style={labelStyle}>Category</label>
+              <label style={labelStyle}>
+  Category <span style={requiredStar}>*</span>
+</label>
               <select
                 style={inputFieldCustom}
                 value={newProd.category_id}
@@ -782,7 +984,9 @@ function Products() {
 
             <div style={gridTwoCols}>
               <div style={inputGroup}>
-                <label style={labelStyle}>Product Name</label>
+                <label style={labelStyle}>
+  Product Name <span style={requiredStar}>*</span>
+</label>
                 <input
                   style={inputFieldCustom}
                   value={selectedProduct.name}
@@ -830,7 +1034,9 @@ function Products() {
               </div>
 
               <div style={inputGroup}>
-                <label style={labelStyle}>Current Price (SAR)</label>
+                <label style={labelStyle}>
+  Current Price (SAR) <span style={requiredStar}>*</span>
+</label>
                 <input
                   type="text"
                   placeholder="0.00"
@@ -904,33 +1110,33 @@ function Products() {
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
-              {pricingRules.map((rule, i) => (
-                <div
-                  key={i}
-                  style={ruleCardStyle(tempSelectedRules.includes(rule.title))}
-                  onClick={() => {
-                    setTempSelectedRules((prev) =>
-                      prev.includes(rule.title)
-                        ? prev.filter((r) => r !== rule.title)
-                        : [...prev, rule.title]
-                    );
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={tempSelectedRules.includes(rule.title)}
-                    readOnly
-                  />
-                  <div style={{ marginLeft: "10px" }}>
-                    <div style={{ fontWeight: "bold", fontSize: "14px" }}>
-                      {rule.title}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#888" }}>
-                      {rule.desc}
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {pricingRules.map((rule) => (
+  <div
+    key={rule.id}
+    style={ruleCardStyle(tempSelectedRules.includes(rule.id))}
+    onClick={() => {
+      setTempSelectedRules((prev) =>
+        prev.includes(rule.id)
+          ? prev.filter((id) => id !== rule.id)
+          : [...prev, rule.id]
+      );
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={tempSelectedRules.includes(rule.id)}
+      readOnly
+    />
+    <div style={{ marginLeft: "10px" }}>
+      <div style={{ fontWeight: "bold", fontSize: "14px" }}>
+        {rule.name}
+      </div>
+      <div style={{ fontSize: "11px", color: "#888" }}>
+        {rule.type} - {rule.value}
+      </div>
+    </div>
+  </div>
+))}
             </div>
 
             <div style={modalFooterCustom}>
@@ -951,11 +1157,7 @@ function Products() {
   );
 }
 
-const pricingRules = [
-  { title: "Minimum 30% Margin", desc: "Ensure price stays above 30% profit" },
-  { title: "Round to Nearest 5", desc: "Prices like 18.5 become 20.00" },
-  { title: "Max Price Cap", desc: "Never exceed 50.00 SAR" },
-];
+
 
 const pageContainer = {
   padding: "40px",
@@ -1136,6 +1338,32 @@ const modalOverlay = {
   justifyContent: "center",
   alignItems: "center",
   zIndex: 1000,
+};
+
+const categoryTitleRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+const categoryEditBtn = {
+  border: "none",
+  backgroundColor: "#ffb74d",
+  color: "white",
+  width: "30px",
+  height: "30px",
+  borderRadius: "6px",
+  cursor: "pointer",
+};
+
+const categoryDeleteBtn = {
+  border: "none",
+  backgroundColor: "#e74c3c",
+  color: "white",
+  width: "30px",
+  height: "30px",
+  borderRadius: "6px",
+  cursor: "pointer",
 };
 
 const modalContentCustom = {
@@ -1367,6 +1595,67 @@ const recommendedBox = {
   padding: "18px",
   marginBottom: "20px",
   color: "#1e5631",
+};
+
+const componentDropdown = {
+  backgroundColor: "white",
+  border: "1px solid #ddd",
+  borderRadius: "10px",
+  marginTop: "-8px",
+  marginBottom: "12px",
+  maxHeight: "150px",
+  overflowY: "auto",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+};
+
+const componentDropdownItem = {
+  padding: "10px 12px",
+  cursor: "pointer",
+  borderBottom: "1px solid #f0f0f0",
+  color: "#2d1b4e",
+  fontWeight: "600",
+};
+
+const componentDropdownEmpty = {
+  padding: "10px 12px",
+  color: "#999",
+  fontSize: "13px",
+};
+
+const selectedComponentsBox = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "10px",
+  border: "1px solid #eee",
+  padding: "15px",
+  borderRadius: "12px",
+  minHeight: "65px",
+  alignItems: "center",
+};
+
+const selectedComponentChip = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  backgroundColor: "#5b2d89",
+  color: "white",
+  padding: "8px 10px",
+  borderRadius: "10px",
+  fontWeight: "600",
+};
+
+const removeChipBtn = {
+  border: "none",
+  backgroundColor: "transparent",
+  color: "white",
+  fontSize: "18px",
+  cursor: "pointer",
+  lineHeight: "1",
+};
+
+const requiredStar = {
+  color: "#e74c3c",
+  fontWeight: "bold",
 };
 
 export default Products;
