@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import ws from 'ws';
 
 dotenv.config();
 
@@ -11,18 +12,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const supabaseOptions = {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
   },
-});
+  realtime: {
+    transport: ws,
+  },
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, supabaseOptions);
 
 export const supabaseAdmin = supabaseServiceRoleKey
-  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    })
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, supabaseOptions)
   : null;

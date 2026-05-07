@@ -13,7 +13,7 @@ import Products from './pages/Products';
 import Costs from './pages/Costs';
 import Seasons from './pages/Seasons';
 import Reports from './pages/Reports';
-import Analytics from './pages/Analytics';
+import Analytics from './components/sales/Analytics';
 import PricingRules from './pages/PricingRules';
 
 function App() {

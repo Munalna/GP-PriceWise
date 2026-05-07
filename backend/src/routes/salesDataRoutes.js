@@ -1,13 +1,12 @@
-import express from "express";
-import multer from "multer";
-import protect from "../middleware/authMiddleware.js";
-import { importSalesData } from "../controllers/salesDataController.js";
+import express from 'express';
+import { importSalesData, getSalesAnalytics } from '../controllers/salesDataController.js';
 
 const router = express.Router();
 
-// Remove fileFilter — validate extension in the controller instead
-const upload = multer({ storage: multer.memoryStorage() });
+// مسار استيراد بيانات المبيعات
+router.post('/import', importSalesData);
 
-router.post("/import", protect, upload.single("file"), importSalesData);
+// مسار جلب إحصائيات الداشبورد
+router.get('/analytics', getSalesAnalytics);
 
 export default router;
