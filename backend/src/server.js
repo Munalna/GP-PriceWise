@@ -31,7 +31,8 @@ app.use("/api/products", productRoutes);
 app.use("/api/seasons", seasonRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use('/api/salesData', salesDataRoutes);
+app.use("/api/sales-data", salesDataRoutes);
+app.use("/api/salesData", salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
 
 app.use((req, res) => {
