@@ -8,6 +8,7 @@ import seasonRoutes from "./routes/seasonRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import salesDataRoutes from "./routes/salesDataRoutes.js";
+
 import pricingRuleRoutes from "./routes/pricingRuleRoutes.js";
 
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
@@ -33,7 +34,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/seasons", seasonRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use("/api/sales-data", salesDataRoutes);
+app.use('/api/salesData', salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
 
 app.use((req, res) => {
@@ -45,6 +46,11 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 startSeasonScheduler();
+
+const routerPaths = app._router.stack
+  .filter((layer) => layer.name === 'router')
+  .map((layer) => layer.regexp.toString());
+console.log('mounted routers:', routerPaths);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
