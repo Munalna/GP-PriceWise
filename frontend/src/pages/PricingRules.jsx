@@ -7,6 +7,27 @@ import {
   deletePricingRule,
 } from "../services/pricingRuleService";
 
+function getRuleUnit(type) {
+  const ruleType = String(type || "").toLowerCase();
+
+  if (ruleType === "minimum margin" || ruleType === "profit margin") {
+    return "%";
+  }
+
+  if (ruleType === "maximum price" || ruleType === "rounding") {
+    return "SAR";
+  }
+
+  return "";
+}
+
+function formatRuleValue(type, value) {
+  if (value === "" || value === null || value === undefined) return "-";
+
+  const unit = getRuleUnit(type);
+  return unit ? `${value} ${unit}` : value;
+}
+
 const normalize = (row) => ({
   id: row?.id,
   name: row?.name ?? "",
@@ -20,9 +41,14 @@ export default function PricingRules() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
 
-  const { data: rules = [], isLoading: loading, error: fetchError } = useQuery({
+  const {
+    data: rules = [],
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
     queryKey: ["pricingRules"],
     queryFn: async () => {
       const data = await getPricingRules();
@@ -31,16 +57,27 @@ export default function PricingRules() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const error = fetchError?.response?.data?.message || fetchError?.message || "";
+  const error =
+    fetchError?.response?.data?.message ||
+    fetchError?.response?.data?.error ||
+    fetchError?.message ||
+    "";
 
   const sortedRules = useMemo(() => {
-    return [...rules].sort((a, b) =>
-      new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    return [...rules].sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     );
   }, [rules]);
 
-  const openCreate = () => { setEditing(null); setShowModal(true); };
-  const openEdit = (rule) => { setEditing(rule); setShowModal(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (rule) => {
+    setEditing(rule);
+    setShowModal(true);
+  };
 
   const onSave = async ({ name, type, value }) => {
     try {
@@ -49,21 +86,33 @@ export default function PricingRules() {
       } else {
         await updatePricingRule(editing.id, { name, type, value });
       }
+
       await invalidate();
       setShowModal(false);
       setEditing(null);
     } catch (e) {
-      alert(e?.response?.data?.message || e?.message || "Save failed");
+      alert(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Save failed"
+      );
     }
   };
 
   const onDelete = async (id) => {
     if (!window.confirm("Delete this pricing rule?")) return;
+
     try {
       await deletePricingRule(id);
       await invalidate();
     } catch (e) {
-      alert(e?.response?.data?.message || e?.message || "Delete failed");
+      alert(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Delete failed"
+      );
     }
   };
 
@@ -106,7 +155,9 @@ export default function PricingRules() {
                   <th style={styles.th}>Type</th>
                   <th style={styles.th}>Value</th>
                   <th style={styles.th}>Created At</th>
-                  <th style={{ ...styles.th, textAlign: "center" }}>Actions</th>
+                  <th style={{ ...styles.th, textAlign: "center" }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
@@ -122,7 +173,9 @@ export default function PricingRules() {
                     <tr key={rule.id} style={styles.tr}>
                       <td style={styles.tdName}>{rule.name || "-"}</td>
                       <td style={styles.td}>{rule.type || "-"}</td>
-                      <td style={styles.td}>{rule.value ?? "-"}</td>
+                      <td style={styles.td}>
+                        {formatRuleValue(rule.type, rule.value)}
+                      </td>
                       <td style={styles.td}>
                         {rule.createdAt
                           ? new Date(rule.createdAt).toLocaleDateString()
@@ -173,6 +226,7 @@ function PricingRuleModal({ initial, onClose, onSave }) {
   const [name, setName] = useState(initial.name || "");
   const [type, setType] = useState(initial.type || "profit margin");
   const [value, setValue] = useState(initial.value ?? "");
+  const [showHelp, setShowHelp] = useState(false);
 
   const submit = () => {
     if (!name.trim()) return alert("Rule name required");
@@ -224,16 +278,42 @@ function PricingRuleModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Value</label>
-          <input
-            style={styles.input}
-            type="number"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g., 10"
-            min="0"
-            step="0.01"
-          />
+          <label style={styles.labelWithHelp}>
+            Value
+            <span
+              style={styles.helpIcon}
+              onMouseEnter={() => setShowHelp(true)}
+              onMouseLeave={() => setShowHelp(false)}
+            >
+              ?
+              {showHelp && (
+                <span style={styles.tooltip}>
+                  Value means the number that controls how this rule affects
+                  the recommended price.
+                  <br />
+                  • For margin rules, it is a percentage added to the cost.
+                  <br />
+                  • For maximum price, it is the highest price the system can
+                  recommend.
+                  <br />• For rounding, it is the amount used to round the final
+                  price.
+                </span>
+              )}
+            </span>
+          </label>
+
+          <div style={styles.valueInputWrap}>
+            <input
+              style={{ ...styles.input, paddingRight: 58, width: "100%" }}
+              type="number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={getRuleUnit(type) === "SAR" ? "e.g., 50" : "e.g., 30"}
+              min="0"
+              step="0.01"
+            />
+            <span style={styles.valueUnit}>{getRuleUnit(type)}</span>
+          </div>
         </div>
 
         <div style={styles.modalFooter}>
@@ -372,6 +452,57 @@ const styles = {
     padding: "12px 12px",
     fontSize: 14,
     outline: "none",
+    boxSizing: "border-box",
+  },
+
+  valueInputWrap: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+  },
+  valueUnit: {
+    position: "absolute",
+    right: 14,
+    color: "#6b7280",
+    fontSize: 13,
+    fontWeight: 900,
+    pointerEvents: "none",
+  },
+  labelWithHelp: {
+    fontSize: 13,
+    fontWeight: 900,
+    color: "#374151",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  helpIcon: {
+    position: "relative",
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    background: "#eef2f7",
+    color: "#382372",
+    fontSize: 12,
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "help",
+  },
+  tooltip: {
+    position: "absolute",
+    left: 24,
+    top: -8,
+    width: 280,
+    background: "#111827",
+    color: "#fff",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    lineHeight: 1.6,
+    zIndex: 10000,
   },
 
   modalFooter: {
@@ -381,7 +512,12 @@ const styles = {
     marginTop: 16,
   },
 
-  loadingRow: { display: "flex", alignItems: "center", gap: 10, color: "#475569" },
+  loadingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    color: "#475569",
+  },
   spinner: {
     width: 16,
     height: 16,
