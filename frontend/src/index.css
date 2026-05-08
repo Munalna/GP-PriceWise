@@ -50,3 +50,11 @@ code {
     color: #747bff;
   }
 }
+.help-icon:hover .tooltip {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.help-icon:hover {
+  background: #e5ddff !important;
+}
