@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase } from '../client'; // keep this fix — unified import
 
 const AuthContext = createContext(null);
 
@@ -22,13 +22,11 @@ export const AuthProvider = ({ children }) => {
         getInitialSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user || null);
+            setUser(session?.user ?? null);
             setLoading(false);
         });
 
-        return () => {
-            if (subscription) subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
 
     return (

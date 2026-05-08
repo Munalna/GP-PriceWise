@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchSeasons,
   createSeason,
@@ -8,56 +9,40 @@ import {
   assignSeasonRules,
 } from "../services/seasonService";
 
-export default function Seasons() {
-  const [loading, setLoading] = useState(true);
-  const [seasons, setSeasons] = useState([]);
-  const [error, setError] = useState("");
+const normalize = (row) => ({
+  id: row?.id,
+  name: row?.season_name ?? "",
+  startDate: row?.start_date ?? "",
+  endDate: row?.end_date ?? "",
+  active: row?.is_active ?? false,
+  rules: row?.rules || [],
+});
 
+export default function Seasons() {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-
-  const [pricingRules, setPricingRules] = useState([]);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
 
-  const normalize = (row) => ({
-    id: row?.id,
-    name: row?.season_name ?? "",
-    startDate: row?.start_date ?? "",
-    endDate: row?.end_date ?? "",
-    active: row?.is_active ?? false,
-    rules: row?.rules || [],
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["seasons"] });
+
+  const { data: seasons = [], isLoading: loading } = useQuery({
+    queryKey: ["seasons"],
+    queryFn: async () => {
+      const data = await fetchSeasons();
+      return Array.isArray(data) ? data.map(normalize) : [];
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
-  const load = async () => {
-    setError("");
-    setLoading(true);
-
-    try {
-      const data = await fetchSeasons();
-      const arr = Array.isArray(data) ? data : [];
-      setSeasons(arr.map(normalize));
-    } catch (e) {
-      setError(e.message || "Failed to load seasons");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadRules = async () => {
-    try {
-      const data = await fetchPricingRules();
-      setPricingRules(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error("Failed to load pricing rules:", e);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    loadRules();
-  }, []);
+  const { data: pricingRules = [] } = useQuery({
+    queryKey: ["pricingRules"],
+    queryFn: () => fetchPricingRules().then(d => Array.isArray(d) ? d : []),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const sortedSeasons = useMemo(() => {
     return [...seasons].sort((a, b) => {
@@ -67,15 +52,8 @@ export default function Seasons() {
     });
   }, [seasons]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setShowModal(true);
-  };
-
-  const openEdit = (s) => {
-    setEditing(s);
-    setShowModal(true);
-  };
+  const openCreate = () => { setEditing(null); setShowModal(true); };
+  const openEdit = (s) => { setEditing(s); setShowModal(true); };
 
   const openRulesModal = (season) => {
     setSelectedSeason(season);
@@ -86,7 +64,7 @@ export default function Seasons() {
   const saveSeasonRules = async () => {
     try {
       await assignSeasonRules(selectedSeason.id, tempSelectedRules);
-      await load();
+      await invalidate();
       setShowRulesModal(false);
       setSelectedSeason(null);
       alert("Season pricing rules assigned successfully.");
@@ -98,20 +76,11 @@ export default function Seasons() {
   const onSave = async ({ name, startDate, endDate }) => {
     try {
       if (!editing) {
-        const created = await createSeason({ name, startDate, endDate });
-        setSeasons((prev) => [...prev, normalize(created)]);
+        await createSeason({ name, startDate, endDate });
       } else {
-        const updated = await updateSeason(editing.id, {
-          name,
-          startDate,
-          endDate,
-        });
-
-        setSeasons((prev) =>
-          prev.map((x) => (x.id === editing.id ? normalize(updated) : x))
-        );
+        await updateSeason(editing.id, { name, startDate, endDate });
       }
-
+      await invalidate();
       setShowModal(false);
       setEditing(null);
     } catch (e) {
@@ -121,10 +90,9 @@ export default function Seasons() {
 
   const onDelete = async (id) => {
     if (!window.confirm("Delete this season?")) return;
-
     try {
       await deleteSeason(id);
-      setSeasons((prev) => prev.filter((x) => x.id !== id));
+      await invalidate();
     } catch (e) {
       alert(e.message || "Delete failed");
     }
@@ -139,7 +107,6 @@ export default function Seasons() {
             Manage seasonal periods, pricing rules, dates, and status.
           </p>
         </div>
-
         <button style={styles.primaryBtn} onClick={openCreate} type="button">
           + Create Season
         </button>
@@ -148,9 +115,6 @@ export default function Seasons() {
       {error && (
         <div style={styles.errorBox}>
           <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
-          <button style={styles.retryBtn} onClick={load} type="button">
-            Retry
-          </button>
         </div>
       )}
 
@@ -168,14 +132,11 @@ export default function Seasons() {
                   <th style={styles.th}>Season Name</th>
                   <th style={styles.th}>Start Date</th>
                   <th style={styles.th}>End Date</th>
-                  <th style={{ ...styles.th, textAlign: "center" }}>
-                    Pricing Rules
-                  </th>
+                  <th style={{ ...styles.th, textAlign: "center" }}>Pricing Rules</th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Status</th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {sortedSeasons.length === 0 ? (
                   <tr>
@@ -189,32 +150,22 @@ export default function Seasons() {
                       <td style={styles.tdName}>{s.name || "-"}</td>
                       <td style={styles.td}>{s.startDate || "-"}</td>
                       <td style={styles.td}>{s.endDate || "-"}</td>
-
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.ruleBadges}>
                           {(s.rules || []).length > 0 ? (
                             s.rules.map((rule) => (
-                              <span key={rule.id} style={styles.ruleBadge}>
-                                {rule.name}
-                              </span>
+                              <span key={rule.id} style={styles.ruleBadge}>{rule.name}</span>
                             ))
                           ) : (
                             <span style={styles.noRules}>No rules</span>
                           )}
                         </div>
                       </td>
-
                       <td style={{ ...styles.td, textAlign: "center" }}>
-                        <span
-                          style={{
-                            ...styles.badge,
-                            background: s.active ? "#1f9d55" : "#475569",
-                          }}
-                        >
+                        <span style={{ ...styles.badge, background: s.active ? "#1f9d55" : "#475569" }}>
                           {s.active ? "Active" : "Inactive"}
                         </span>
                       </td>
-
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
                           <button
@@ -222,27 +173,19 @@ export default function Seasons() {
                             onClick={() => openRulesModal(s)}
                             type="button"
                             title="Assign Rules"
-                          >
-                            🔗
-                          </button>
-
+                          >🔗</button>
                           <button
                             style={styles.iconBtn}
                             onClick={() => openEdit(s)}
                             type="button"
                             title="Edit Season"
-                          >
-                            ✏️
-                          </button>
-
+                          >✏️</button>
                           <button
                             style={{ ...styles.iconBtn, background: "#ef4444" }}
                             onClick={() => onDelete(s.id)}
                             type="button"
                             title="Delete Season"
-                          >
-                            🗑️
-                          </button>
+                          >🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -257,10 +200,7 @@ export default function Seasons() {
       {showModal && (
         <SeasonModal
           initial={editing || { name: "", startDate: "", endDate: "" }}
-          onClose={() => {
-            setShowModal(false);
-            setEditing(null);
-          }}
+          onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={onSave}
         />
       )}
@@ -269,18 +209,9 @@ export default function Seasons() {
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0 }}>
-                Assign Rules to {selectedSeason.name}
-              </h3>
-              <button
-                style={styles.closeBtn}
-                onClick={() => setShowRulesModal(false)}
-                type="button"
-              >
-                ✕
-              </button>
+              <h3 style={{ margin: 0 }}>Assign Rules to {selectedSeason.name}</h3>
+              <button style={styles.closeBtn} onClick={() => setShowRulesModal(false)} type="button">✕</button>
             </div>
-
             <div style={styles.rulesList}>
               {pricingRules.length > 0 ? (
                 pricingRules.map((rule) => (
@@ -295,16 +226,10 @@ export default function Seasons() {
                       );
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={tempSelectedRules.includes(rule.id)}
-                      readOnly
-                    />
+                    <input type="checkbox" checked={tempSelectedRules.includes(rule.id)} readOnly />
                     <div>
                       <div style={{ fontWeight: 900 }}>{rule.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>
-                        {rule.type} - {rule.value}
-                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{rule.type} - {rule.value}</div>
                     </div>
                   </div>
                 ))
@@ -312,22 +237,9 @@ export default function Seasons() {
                 <p style={{ color: "#6b7280" }}>No pricing rules found.</p>
               )}
             </div>
-
             <div style={styles.modalFooter}>
-              <button
-                style={styles.secondaryBtn}
-                onClick={() => setShowRulesModal(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                style={styles.primaryBtn}
-                onClick={saveSeasonRules}
-                type="button"
-              >
-                Assign Rules
-              </button>
+              <button style={styles.secondaryBtn} onClick={() => setShowRulesModal(false)} type="button">Cancel</button>
+              <button style={styles.primaryBtn} onClick={saveSeasonRules} type="button">Assign Rules</button>
             </div>
           </div>
         </div>
@@ -345,11 +257,7 @@ function SeasonModal({ initial, onClose, onSave }) {
     if (!name.trim()) return alert("Season name required");
     if (!startDate) return alert("Start date required");
     if (!endDate) return alert("End date required");
-
-    if (new Date(endDate) < new Date(startDate)) {
-      return alert("End date must be after start date");
-    }
-
+    if (new Date(endDate) < new Date(startDate)) return alert("End date must be after start date");
     onSave({ name: name.trim(), startDate, endDate });
   };
 
@@ -357,62 +265,26 @@ function SeasonModal({ initial, onClose, onSave }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.modalHeader}>
-          <h3 style={{ margin: 0 }}>
-            {initial?.id ? "Update Season" : "Create Season"}
-          </h3>
-          <button style={styles.closeBtn} onClick={onClose} type="button">
-            ✕
-          </button>
+          <h3 style={{ margin: 0 }}>{initial?.id ? "Update Season" : "Create Season"}</h3>
+          <button style={styles.closeBtn} onClick={onClose} type="button">✕</button>
         </div>
-
         <div style={styles.field}>
-          <label style={styles.label}>
-            Season Name <span style={styles.requiredStar}>*</span>
-          </label>
-          <input
-            required
-            style={styles.input}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Ramadan Special"
-          />
+          <label style={styles.label}>Season Name <span style={styles.requiredStar}>*</span></label>
+          <input required style={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Ramadan Special" />
         </div>
-
         <div style={styles.grid2}>
           <div style={styles.field}>
-            <label style={styles.label}>
-              Start Date <span style={styles.requiredStar}>*</span>
-            </label>
-            <input
-              required
-              style={styles.input}
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+            <label style={styles.label}>Start Date <span style={styles.requiredStar}>*</span></label>
+            <input required style={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-
           <div style={styles.field}>
-            <label style={styles.label}>
-              End Date <span style={styles.requiredStar}>*</span>
-            </label>
-            <input
-              required
-              style={styles.input}
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+            <label style={styles.label}>End Date <span style={styles.requiredStar}>*</span></label>
+            <input required style={styles.input} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
-
         <div style={styles.modalFooter}>
-          <button style={styles.secondaryBtn} onClick={onClose} type="button">
-            Cancel
-          </button>
-          <button style={styles.primaryBtn} onClick={submit} type="button">
-            Save
-          </button>
+          <button style={styles.secondaryBtn} onClick={onClose} type="button">Cancel</button>
+          <button style={styles.primaryBtn} onClick={submit} type="button">Save</button>
         </div>
       </div>
     </div>

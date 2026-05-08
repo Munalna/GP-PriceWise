@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Container, Alert, Spinner, Row, Col } from "react-bootstrap";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import FixedCostsSection from "../components/cost/FixedCostsSection";
 import VariableComponentsSection from "../components/cost/VariableComponentsSection";
@@ -16,31 +17,25 @@ import {
 } from "../services/costService";
 
 const Costs = () => {
-  const [loading, setLoading] = useState(true);
-  const [fixedCosts, setFixedCosts] = useState([]);
-  const [components, setComponents] = useState([]);
+  const queryClient = useQueryClient();
   const [error, setError] = useState("");
 
-  const loadAll = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const [fixed, vars] = await Promise.all([
-        fetchFixedCosts(),
-        fetchVariableComponents(),
-      ]);
-      setFixedCosts(fixed);
-      setComponents(vars);
-    } catch (e) {
-      setError(e.message || "Failed to load costs.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
+    queryKey: ["fixedCosts"],
+    queryFn: fetchFixedCosts,
+    staleTime: 1000 * 60 * 5,
+  });
 
-  useEffect(() => {
-    loadAll();
-  }, []);
+  const { data: components = [], isLoading: loadingVars } = useQuery({
+    queryKey: ["varComponents"],
+    queryFn: fetchVariableComponents,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const loading = loadingFixed || loadingVars;
+
+  const invalidateFixed = () => queryClient.invalidateQueries({ queryKey: ["fixedCosts"] });
+  const invalidateVars  = () => queryClient.invalidateQueries({ queryKey: ["varComponents"] });
 
   return (
     <Container fluid className="p-0">
@@ -59,18 +54,16 @@ const Costs = () => {
             <FixedCostsSection
               items={fixedCosts}
               onAdd={async (payload) => {
-                const created = await createFixedCost(payload);
-                setFixedCosts((prev) => [created, ...prev]);
+                await createFixedCost(payload);
+                await invalidateFixed();
               }}
               onEdit={async (id, payload) => {
-                const updated = await updateFixedCost(id, payload);
-                setFixedCosts((prev) =>
-                  prev.map((x) => (x.id === id ? updated : x))
-                );
+                await updateFixedCost(id, payload);
+                await invalidateFixed();
               }}
               onDelete={async (id) => {
                 await deleteFixedCost(id);
-                setFixedCosts((prev) => prev.filter((x) => x.id !== id));
+                await invalidateFixed();
               }}
             />
           </Col>
@@ -79,18 +72,16 @@ const Costs = () => {
             <VariableComponentsSection
               items={components}
               onAdd={async (payload) => {
-                const created = await createVariableComponent(payload);
-                setComponents((prev) => [created, ...prev]);
+                await createVariableComponent(payload);
+                await invalidateVars();
               }}
               onEdit={async (id, payload) => {
-                const updated = await updateVariableComponent(id, payload);
-                setComponents((prev) =>
-                  prev.map((x) => (x.id === id ? updated : x))
-                );
+                await updateVariableComponent(id, payload);
+                await invalidateVars();
               }}
               onDelete={async (id) => {
                 await deleteVariableComponent(id);
-                setComponents((prev) => prev.filter((x) => x.id !== id));
+                await invalidateVars();
               }}
             />
           </Col>

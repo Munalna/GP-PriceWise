@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 
@@ -8,117 +8,70 @@ import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
-import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
-import Costs from './pages/Costs';
-import Seasons from './pages/Seasons';
-import Reports from './pages/Reports';
-import Analytics from './components/sales/Analytics';
-import PricingRules from './pages/PricingRules';
+const Dashboard    = lazy(() => import('./pages/Dashboard'));
+const Products     = lazy(() => import('./pages/Products'));
+const Costs        = lazy(() => import('./pages/Costs'));
+const Seasons      = lazy(() => import('./pages/Seasons'));
+const Reports      = lazy(() => import('./pages/Reports'));
+const Analytics = lazy(() => import('./components/sales/Analytics'));
+const PricingRules = lazy(() => import('./pages/PricingRules'));
+
+const ProtectedRoute = ({ children }) => {
+  const saved = localStorage.getItem('supabase_token');
+  const token = saved ? JSON.parse(saved) : null;
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+};
+
+const PageLoader = () => (
+  <div className="d-flex justify-content-center align-items-center vh-100">
+    <div className="spinner-border text-purple" role="status"
+         style={{ color: '#382372' }}>
+      <span className="visually-hidden">Loading...</span>
+    </div>
+  </div>
+);
 
 function App() {
-  const [token, setToken] = useState(() => {
-    const saved = localStorage.getItem('supabase_token');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const ProtectedRoute = ({ children }) => {
-    if (!token) {
-      return <Navigate to="/login" replace />;
-    }
-    return children;
-  };
-
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
-        <Route path="/login" element={<Login setToken={setToken} />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+          {/* Public routes */}
+          <Route path="/login"          element={<Login />} />
+          <Route path="/signup"         element={<Signup />} />
+          <Route path="/verify-email"   element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected routes */}
+          {[
+            { path: '/dashboard',     Page: Dashboard },
+            { path: '/products',      Page: Products },
+            { path: '/costs',         Page: Costs },
+            { path: '/seasons',       Page: Seasons },
+            { path: '/pricing-rules', Page: PricingRules },
+            { path: '/reports',       Page: Reports },
+            { path: '/analytics',     Page: Analytics },
+          ].map(({ path, Page }) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Page />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+          ))}
 
-        <Route
-          path="/products"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Products />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/costs"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Costs />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/seasons"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Seasons />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/pricing-rules"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <PricingRules />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Reports />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <Analytics />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
