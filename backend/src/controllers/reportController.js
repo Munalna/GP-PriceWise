@@ -25,15 +25,15 @@ function buildFlatRows(categories, importedMap) {
       const key = prod.name?.trim().toLowerCase();
       const imp = importedMap[key] || {};
 
-      const cost        =  Number(prod.variable_cost ?? prod.b_cost ?? prod.c_price ?? imp.cost ?? 0);
-      const compPrice   = Number(prod.avg_competitor_price ?? prod.comp_price     ?? imp.competitor_price ?? 0);
-      const recommended = Number(prod.recommended_price  ?? imp.recommended_price ?? 0);
+      const cost        = Number(prod.variable_cost ?? prod.b_cost ?? prod.c_price ?? imp.cost ?? 0);
+      const compPrice   = Number(prod.avg_competitor_price ?? prod.comp_price ?? imp.competitor_price ?? 0);
+      const recommended = Number(prod.r_price ?? prod.recommended_price ?? imp.recommended_price ?? 0);
 
       rows.push({
         product_name:      prod.name ?? imp.name ?? key,
         cost,
         competitor_price:  compPrice,
-        recommended_price: Number(prod.recommended_price ?? imp.recommended_price ?? 0),
+        recommended_price: recommended,
       });
     });
   });

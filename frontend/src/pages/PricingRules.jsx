@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getPricingRules,
   createPricingRule,
@@ -6,81 +7,53 @@ import {
   deletePricingRule,
 } from "../services/pricingRuleService";
 
-export default function PricingRules() {
-  const [loading, setLoading] = useState(true);
-  const [rules, setRules] = useState([]);
-  const [error, setError] = useState("");
+const normalize = (row) => ({
+  id: row?.id,
+  name: row?.name ?? "",
+  type: row?.type ?? "",
+  value: row?.value ?? "",
+  createdAt: row?.created_at ?? "",
+});
 
+export default function PricingRules() {
+  const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const normalize = (row) => ({
-    id: row?.id,
-    name: row?.name ?? "",
-    type: row?.type ?? "",
-    value: row?.value ?? "",
-    createdAt: row?.created_at ?? "",
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
+
+  const { data: rules = [], isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ["pricingRules"],
+    queryFn: async () => {
+      const data = await getPricingRules();
+      return Array.isArray(data) ? data.map(normalize) : [];
+    },
+    staleTime: 1000 * 60 * 5,
   });
 
-  const load = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const data = await getPricingRules();
-      const arr = Array.isArray(data) ? data : [];
-      setRules(arr.map(normalize));
-    } catch (e) {
-      setError(
-        e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e.message ||
-          "Failed to load pricing rules"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const error = fetchError?.response?.data?.message || fetchError?.message || "";
 
   const sortedRules = useMemo(() => {
-    return [...rules].sort((a, b) => {
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    });
+    return [...rules].sort((a, b) =>
+      new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
   }, [rules]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setShowModal(true);
-  };
-
-  const openEdit = (rule) => {
-    setEditing(rule);
-    setShowModal(true);
-  };
+  const openCreate = () => { setEditing(null); setShowModal(true); };
+  const openEdit = (rule) => { setEditing(rule); setShowModal(true); };
 
   const onSave = async ({ name, type, value }) => {
     try {
       if (!editing) {
-        const created = await createPricingRule({ name, type, value });
-        setRules((prev) => [normalize(created), ...prev]);
+        await createPricingRule({ name, type, value });
       } else {
-        const updated = await updatePricingRule(editing.id, { name, type, value });
-        setRules((prev) =>
-          prev.map((x) => (x.id === editing.id ? normalize(updated) : x))
-        );
+        await updatePricingRule(editing.id, { name, type, value });
       }
+      await invalidate();
       setShowModal(false);
       setEditing(null);
     } catch (e) {
-      alert(
-        e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e.message ||
-          "Save failed"
-      );
+      alert(e?.response?.data?.message || e?.message || "Save failed");
     }
   };
 
@@ -88,14 +61,9 @@ export default function PricingRules() {
     if (!window.confirm("Delete this pricing rule?")) return;
     try {
       await deletePricingRule(id);
-      setRules((prev) => prev.filter((x) => x.id !== id));
+      await invalidate();
     } catch (e) {
-      alert(
-        e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e.message ||
-          "Delete failed"
-      );
+      alert(e?.response?.data?.message || e?.message || "Delete failed");
     }
   };
 
@@ -117,7 +85,7 @@ export default function PricingRules() {
       {error && (
         <div style={styles.errorBox}>
           <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
-          <button style={styles.retryBtn} onClick={load} type="button">
+          <button style={styles.retryBtn} onClick={invalidate} type="button">
             Retry
           </button>
         </div>

@@ -1,45 +1,62 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { Spinner, Alert } from "react-bootstrap";
-import { supabase } from "../client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
 
-const API_URL = "http://localhost:3000/api/products";
+const API_URL = "/api/products";
 
 function Products() {
-  const [categories, setCategories] = useState([]);
-  const [varComponents, setVarComponents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState(null);
-  const [error, setError] = useState("");
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useQueryClient();
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
+
+  const { data: categories = [], isLoading: loadingCats } = useQuery({
+    queryKey: ["products"],
+    queryFn: () =>
+      fetch(API_URL, { headers: { "user-id": userId } }).then(r => r.json()),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 3,
+  });
+
+  const { data: varComponents = [], isLoading: loadingVC } = useQuery({
+    queryKey: ["varComponents"],
+    queryFn: () =>
+      fetch(`${API_URL}/var-components`, { headers: { "user-id": userId } }).then(r => r.json()),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: pricingRules = [] } = useQuery({
+    queryKey: ["pricingRules"],
+    queryFn: () => api.get("/pricing-rules").then(r => r.data),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const loading = loadingCats || loadingVC;
+
+  const [error, setError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
   const [riskResult, setRiskResult] = useState(null);
   const [showRiskModal, setShowRiskModal] = useState(false);
   const [aiRecommendedPrices, setAiRecommendedPrices] = useState({});
-
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showCategoryInput, setShowCategoryInput] = useState(false);
-
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [productIdToDelete, setProductIdToDelete] = useState(null);
   const [marketCheck, setMarketCheck] = useState(null);
   const [componentSearch, setComponentSearch] = useState("");
-
-  const [newProd, setNewProd] = useState({
-    name: "",
-    components: [],
-    category_id: "",
-  });
-
+  const [newProd, setNewProd] = useState({ name: "", components: [], category_id: "" });
   const [newCatName, setNewCatName] = useState("");
-
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
-  const [pricingRules, setPricingRules] = useState([]);
 
   const calculateAvg = (prices) => {
     if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
@@ -49,198 +66,84 @@ function Products() {
     return (sum / validPrices.length).toFixed(2);
   };
 
- const handleCheckMarketProduct = async (name) => {
-  if (!name || name.trim().length < 2) {
-    setMarketCheck(null);
-    return;
-  }
-
-  try {
-    const result = await checkMarketProduct(name);
-    setMarketCheck(result);
-  } catch (err) {
-    console.error("Market check error:", err);
-  }
-};
-
-const loadPricingRules = useCallback(async () => {
-  try {
-    const { data } = await api.get("/pricing-rules");
-    setPricingRules(Array.isArray(data) ? data : []);
-  } catch (err) {
-    console.error("Error loading pricing rules:", err);
-  }
-}, []);
-
-
-  const loadData = useCallback(async () => {
-    if (!userId) return;
-
-    setError("");
-    setLoading(true);
-
+  const handleCheckMarketProduct = async (name) => {
+    if (!name || name.trim().length < 2) { setMarketCheck(null); return; }
     try {
-      const authHeader = { "user-id": userId };
-
-      const response = await fetch(API_URL, { headers: authHeader });
-      const data = await response.json();
-      setCategories(Array.isArray(data) ? data : []);
-
-      const vcRes = await fetch(`${API_URL}/var-components`, {
-        headers: authHeader,
-      });
-      const vcData = await vcRes.json();
-      setVarComponents(Array.isArray(vcData) ? vcData : []);
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError(err.message || "Failed to load products.");
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    const getAuthenticatedUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        setUserId(user.id);
-      } else {
-        setLoading(false);
-        setError("No active session found. Please login.");
-      }
-    };
-
-    getAuthenticatedUser();
-  }, []);
-
-  useEffect(() => {
-  if (userId) {
-    loadData();
-    loadPricingRules();
-  }
-}, [userId, loadData, loadPricingRules]);
+      const result = await checkMarketProduct(name);
+      setMarketCheck(result);
+    } catch (err) { console.error("Market check error:", err); }
+  };
 
   const calculateTotalVcost = (prodComponents) => {
     if (!prodComponents || !Array.isArray(prodComponents)) return 0;
-
     return prodComponents.reduce((sum, item) => {
       const dbInfo = varComponents.find((c) => c.name === item.name);
       const unitCost = dbInfo ? Number(dbInfo.cost_per_unit) : 0;
-      const quantity = Number(item.qty) || 0;
-      return sum + unitCost * quantity;
+      return sum + unitCost * (Number(item.qty) || 0);
     }, 0);
   };
 
   const filteredComponents = varComponents.filter((comp) =>
-  comp.name.toLowerCase().includes(componentSearch.toLowerCase())
-);
+    comp.name.toLowerCase().includes(componentSearch.toLowerCase())
+  );
+
+  const parseComponents = (compData) => {
+    if (!compData) return [];
+    if (Array.isArray(compData)) return compData;
+    try { return JSON.parse(compData); } catch (e) { return []; }
+  };
 
   const handleAnalyzePricing = async (productId) => {
-  setRiskLoading(true);
-  setError("");
-
-  try {
-    const result = await getAIPriceRecommendation(productId);
-
-    setRiskResult(result.data);
-    setShowRiskModal(true);
-
-    if (result.data?.ai?.recommended_price) {
-      setAiRecommendedPrices((prev) => ({
-        ...prev,
-        [productId]: result.data.ai.recommended_price,
-      }));
-    }
-  } catch (err) {
-  console.error("Pricing analysis error:", err.response?.data || err.message);
-
-  setError(
-    err.response?.data?.message ||
-    err.response?.data?.error ||
-    err.message ||
-    "Failed to analyze product pricing."
-  );
-} finally {
-  setRiskLoading(false);
-}
-};
+    setRiskLoading(true);
+    setError("");
+    try {
+      const result = await getAIPriceRecommendation(productId);
+      setRiskResult(result.data);
+      setShowRiskModal(true);
+      if (result.data?.ai?.recommended_price) {
+        setAiRecommendedPrices((prev) => ({ ...prev, [productId]: result.data.ai.recommended_price }));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to analyze product pricing.");
+    } finally { setRiskLoading(false); }
+  };
 
   const toggleComponent = (name, isEdit = false) => {
     const target = isEdit ? selectedProduct : newProd;
     let updatedComps = [...(target.components || [])];
     const index = updatedComps.findIndex((c) => c.name === name);
-
-    if (index > -1) {
-      updatedComps = updatedComps.filter((c) => c.name !== name);
-    } else {
-      updatedComps.push({ name, qty: 1 });
-    }
-
-    if (isEdit) {
-      setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    } else {
-      setNewProd({ ...newProd, components: updatedComps });
-    }
+    if (index > -1) updatedComps = updatedComps.filter((c) => c.name !== name);
+    else updatedComps.push({ name, qty: 1 });
+    if (isEdit) setSelectedProduct({ ...selectedProduct, components: updatedComps });
+    else setNewProd({ ...newProd, components: updatedComps });
   };
 
   const updateQty = (name, val, isEdit = false) => {
     const target = isEdit ? selectedProduct : newProd;
     const intVal = Math.max(0, parseInt(val, 10) || 0);
-
     const updatedComps = target.components.map((c) =>
       c.name === name ? { ...c, qty: intVal } : c
     );
-
-    if (isEdit) {
-      setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    } else {
-      setNewProd({ ...newProd, components: updatedComps });
-    }
+    if (isEdit) setSelectedProduct({ ...selectedProduct, components: updatedComps });
+    else setNewProd({ ...newProd, components: updatedComps });
   };
 
   const handleAddNewCategory = async () => {
     if (!newCatName) return;
-
     try {
       const res = await fetch(`${API_URL}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "user-id": userId },
         body: JSON.stringify({ name: newCatName }),
       });
-
-      if (res.ok) {
-        await loadData();
-        setNewCatName("");
-        setShowCategoryInput(false);
-      }
-    } catch (err) {
-      setError("Error adding category");
-    }
+      if (res.ok) { await invalidate(); setNewCatName(""); setShowCategoryInput(false); }
+    } catch (err) { setError("Error adding category"); }
   };
 
   const handleSaveProduct = async () => {
-
-  if (!newProd.name.trim()) {
-
-    return setError("Product name is required.");
-
-  }
-
-  if (!newProd.category_id) {
-
-    return setError("Category is required.");
-
-  }
-
-  if (!newProd.components || newProd.components.length === 0) {
-
-    return setError("At least one component is required.");
-
-  }
-
+    if (!newProd.name.trim())        return setError("Product name is required.");
+    if (!newProd.category_id)        return setError("Category is required.");
+    if (!newProd.components?.length) return setError("At least one component is required.");
     try {
       const res = await fetch(API_URL, {
         method: "POST",
@@ -249,167 +152,91 @@ const loadPricingRules = useCallback(async () => {
           ...newProd,
           components: JSON.stringify(newProd.components),
           v_cost: calculateTotalVcost(newProd.components).toString(),
-          b_cost: "0.00",
-          c_price: "0.00",
-          comp_price: "0.00",
+          b_cost: "0.00", c_price: "0.00", comp_price: "0.00",
         }),
       });
-
-      if (res.ok) {
-        await loadData();
-        setShowAddModal(false);
-        setNewProd({ name: "", components: [], category_id: "" });
-      }
-    } catch (err) {
-      setError("Error saving product");
-    }
+      if (res.ok) { await invalidate(); setShowAddModal(false); setNewProd({ name: "", components: [], category_id: "" }); }
+    } catch (err) { setError("Error saving product"); }
   };
 
-   const handleUpdateProduct = async () => {
-  if (!selectedProduct.name || !selectedProduct.name.trim()) {
-    return setError("Product name is required.");
-  }
-
-  if (
-    selectedProduct.c_price === "" ||
-    selectedProduct.c_price === null ||
-    selectedProduct.c_price === undefined
-  ) {
-    return setError("Current price is required.");
-  }
-
-  if (Number(selectedProduct.c_price) < 0) {
-    return setError("Current price cannot be negative.");
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({
-        ...selectedProduct,
-        components: JSON.stringify(selectedProduct.components),
-        v_cost: calculateTotalVcost(selectedProduct.components).toString(),
-        c_price: selectedProduct.c_price,
-        comp_price: selectedProduct.comp_price,
-        b_cost: selectedProduct.b_cost,
-      }),
-    });
-
-    if (res.ok) {
-      await loadData();
-      setShowEditModal(false);
-    }
-  } catch (err) {
-    setError("Error updating product");
-  }
-};
+  const handleUpdateProduct = async () => {
+    if (!selectedProduct.name?.trim()) return setError("Product name is required.");
+    if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return setError("Current price is required.");
+    if (Number(selectedProduct.c_price) < 0) return setError("Current price cannot be negative.");
+    try {
+      const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "user-id": userId },
+        body: JSON.stringify({
+          ...selectedProduct,
+          components: JSON.stringify(selectedProduct.components),
+          v_cost: calculateTotalVcost(selectedProduct.components).toString(),
+          c_price: selectedProduct.c_price,
+          comp_price: selectedProduct.comp_price,
+          b_cost: selectedProduct.b_cost,
+        }),
+      });
+      if (res.ok) { await invalidate(); setShowEditModal(false); }
+    } catch (err) { setError("Error updating product"); }
+  };
 
   const confirmDelete = async () => {
     if (!productIdToDelete) return;
-
     try {
       const res = await fetch(`${API_URL}/${productIdToDelete}`, {
         method: "DELETE",
         headers: { "user-id": userId },
       });
-
-      if (res.ok) {
-        setCategories((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            products: cat.products.filter((p) => p.id !== productIdToDelete),
-          }))
-        );
-
-        setShowDeleteConfirm(false);
-        setProductIdToDelete(null);
-      }
-    } catch (err) {
-      setError("Error deleting product");
-    }
+      if (res.ok) { await invalidate(); setShowDeleteConfirm(false); setProductIdToDelete(null); }
+    } catch (err) { setError("Error deleting product"); }
   };
 
   const handleSaveRules = async () => {
     const targetType = selectedProduct ? "products" : "categories";
     const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
-
     try {
       const res = await fetch(`${API_URL}/${targetType}/${targetId}/rules`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "user-id": userId },
         body: JSON.stringify({ rules: tempSelectedRules }),
       });
-
       if (res.ok) {
-  if (selectedProduct) {
-    await handleAnalyzePricing(selectedProduct.id);
-  }
-
-  await loadData();
-  setShowRulesModal(false);
-  alert("Pricing rules assigned successfully.");
-}
-    } catch (err) {
-      setError("Error saving rules");
-    }
+        if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+        await invalidate();
+        setShowRulesModal(false);
+        alert("Pricing rules assigned successfully.");
+      }
+    } catch (err) { setError("Error saving rules"); }
   };
 
   const handleRenameCategory = async (cat) => {
-  const newName = prompt("Enter new category name:", cat.name);
-
-  if (!newName || !newName.trim()) return;
-
-  try {
-    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({ name: newName.trim() }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || "Error renaming category");
-    }
-
-    await loadData();
-  } catch (err) {
-    setError(err.message);
-  }
-};
-
-const handleDeleteCategory = async (cat) => {
-  const confirmed = window.confirm(`Delete category "${cat.name}"?`);
-
-  if (!confirmed) return;
-
-  try {
-    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-      method: "DELETE",
-      headers: { "user-id": userId },
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || "Error deleting category");
-    }
-
-    await loadData();
-  } catch (err) {
-    setError(err.message);
-  }
-};
-
-  const parseComponents = (compData) => {
-    if (!compData) return [];
-    if (Array.isArray(compData)) return compData;
-
+    const newName = prompt("Enter new category name:", cat.name);
+    if (!newName?.trim()) return;
     try {
-      return JSON.parse(compData);
-    } catch (e) {
-      return [];
-    }
+      const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "user-id": userId },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error renaming category");
+      await invalidate();
+    } catch (err) { setError(err.message); }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+        method: "DELETE",
+        headers: { "user-id": userId },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error deleting category");
+      }
+      await invalidate();
+    } catch (err) { setError(err.message); }
   };
 
   return (

@@ -14,7 +14,11 @@ export const signUpUser = async (email, password, businessName) => {
   });
 
   if (error) throw error;
-  
+
+ await supabase.from('profiles').insert({
+  user_id: data.user.id,
+  business_name: businessName
+});
   return {
     user: data.user,
     session: data.session

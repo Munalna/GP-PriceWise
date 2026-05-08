@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchDailyReport,
   exportReportPdf,
@@ -36,26 +37,20 @@ function VsMarket({ recommended, competitor }) {
 
 // ── Component ────────────────────────────────────────────────────
 export default function Reports() {
-  const [loading, setLoading]     = useState(true);
-  const [rows, setRows]           = useState([]);
-  const [error, setError]         = useState("");
+  const queryClient = useQueryClient();
   const [exporting, setExporting] = useState(false);
-  
 
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
+  const { data: rows = [], isLoading: loading, error: fetchError } = useQuery({
+    queryKey: ["dailyReport"],
+    queryFn: async () => {
       const data = await fetchDailyReport();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || "Failed to load report");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 1000 * 60 * 3,
+  });
 
-  useEffect(() => { load(); }, []);
+  const error = fetchError?.message || "";
+  const reload = () => queryClient.invalidateQueries({ queryKey: ["dailyReport"] });
 
   const handleExport = async () => {
     try {
@@ -67,7 +62,6 @@ export default function Reports() {
       setExporting(false);
     }
   };
-
 
   // ── Summary stats ─────────────────────────────────────────────
   const totalProducts  = rows.length;
@@ -110,7 +104,7 @@ export default function Reports() {
       {error && (
         <div style={styles.errorBox}>
           <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
-          <button style={styles.retryBtn} onClick={load} type="button">Retry</button>
+          <button style={styles.retryBtn} onClick={reload} type="button">Retry</button>
         </div>
       )}
 
