@@ -18,6 +18,7 @@ const VariableComponentsSection = ({ items, onAdd, onEdit, onDelete }) => {
           <small className="text-muted">Total components:</small>{" "}
           <Badge bg="secondary">{count}</Badge>
         </div>
+
         <Button onClick={() => { setEditing(null); setShowModal(true); }}>
           + Add Component
         </Button>
@@ -28,20 +29,31 @@ const VariableComponentsSection = ({ items, onAdd, onEdit, onDelete }) => {
           <thead className="table-light">
             <tr>
               <th>Name</th>
+              <th>Total Cost Paid</th>
+              <th>Total Quantity</th>
               <th>Unit</th>
-              <th>Cost per Unit (SAR)</th>
+              <th>Cost per Unit</th>
               <th style={{ width: 180 }}>Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {count === 0 ? (
-              <tr><td colSpan="4" className="text-center text-muted py-4">No components added yet.</td></tr>
+              <tr>
+                <td colSpan="6" className="text-center text-muted py-4">
+                  No components added yet.
+                </td>
+              </tr>
             ) : (
               items.map((c) => (
                 <tr key={c.id}>
                   <td>{c.name}</td>
+                  <td>{Number(c.total_cost_paid || 0).toFixed(2)} SAR</td>
+                  <td>{Number(c.total_quantity || 0).toFixed(2)}</td>
                   <td>{c.unit}</td>
-                  <td>{Number(c.cost_per_unit).toFixed(4)}</td>
+                  <td>
+                    {Number(c.cost_per_unit || 0).toFixed(6)} SAR per {c.unit}
+                  </td>
                   <td>
                     <Button
                       size="sm"
@@ -51,10 +63,14 @@ const VariableComponentsSection = ({ items, onAdd, onEdit, onDelete }) => {
                     >
                       Delete
                     </Button>
+
                     <Button
                       size="sm"
                       variant="outline-primary"
-                      onClick={() => { setEditing(c); setShowModal(true); }}
+                      onClick={() => {
+                        setEditing(c);
+                        setShowModal(true);
+                      }}
                     >
                       Edit
                     </Button>
@@ -73,6 +89,7 @@ const VariableComponentsSection = ({ items, onAdd, onEdit, onDelete }) => {
         onSave={async (payload) => {
           if (editing) await onEdit(editing.id, payload);
           else await onAdd(payload);
+
           setShowModal(false);
         }}
       />
