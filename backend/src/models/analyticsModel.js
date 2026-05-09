@@ -319,55 +319,99 @@ export async function getActiveSeason(userId) {
   return data;
 }
 
+export async function getSeasonPricingRules(userId, seasonId) {
+  if (!seasonId) return [];
+
+  const db = getDbClient();
+
+  const { data, error } = await db
+    .from(PRICING_RULE_ASSIGNMENTS_TABLE)
+    .select(`
+      id,
+      user_id,
+      rule_id,
+      target_type,
+      target_id,
+      pricing_rules (
+        id,
+        name,
+        type,
+        value
+      )
+    `)
+    .eq("user_id", userId)
+    .eq("target_type", "season")
+    .eq("target_id", seasonId);
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function buildProductPricingAnalysisInput(userId, productId) {
   const product = await getProductById(userId, productId);
 
-  if (!product) {
-    return null;
-  }
+  if (!product) return null;
 
   const categoryName = product.categories?.name || "Unknown";
 
   const [
-  componentCostFromRelation,
-  componentCostFromText,
-  marketResult,
-  assignedRules,
-  activeSeason,
-] = await Promise.all([
-  getProductComponentsCost(product.id),
-  getVariableComponentsCostFromProductText(userId, product.components),
-  getMarketPricesByProductName(product.name, categoryName),
-  getAssignedPricingRules(userId, product.id, product.category_id),
-  getActiveSeason(userId),
-]);
+    componentCostFromRelation,
+    componentCostFromText,
+    marketResult,
+    assignedRules,
+    activeSeason,
+  ] = await Promise.all([
+    getProductComponentsCost(product.id),
+    getVariableComponentsCostFromProductText(userId, product.components),
+    getMarketPricesByProductName(product.name, categoryName),
+    getAssignedPricingRules(userId, product.id, product.category_id),
+    getActiveSeason(userId),
+  ]);
 
-const componentCostResult =
-  componentCostFromRelation.total_component_cost > 0
-    ? componentCostFromRelation
-    : componentCostFromText;
+  const seasonRules = await getSeasonPricingRules(userId, activeSeason?.id);
 
-  const targetMarginRule = assignedRules.find((assignment) => {
-    const rule = assignment.pricing_rules;
-    return rule?.type === "margin" || rule?.type === "target_margin";
-  });
+  const productRules = assignedRules
+    .filter((a) => a.target_type === "product")
+    .map((a) => a.pricing_rules)
+    .filter(Boolean);
+
+  const categoryRules = assignedRules
+    .filter((a) => a.target_type === "category")
+    .map((a) => a.pricing_rules)
+    .filter(Boolean);
+
+  const activeSeasonRules = seasonRules
+    .map((a) => a.pricing_rules)
+    .filter(Boolean);
+
+  const allRules = [...productRules, ...categoryRules, ...activeSeasonRules];
+
+  const targetMarginRule = allRules.find((rule) =>
+    ["minimum margin", "profit margin"].includes(
+      String(rule?.type || "").toLowerCase()
+    )
+  );
+
+  const componentCostResult =
+    componentCostFromRelation.total_component_cost > 0
+      ? componentCostFromRelation
+      : componentCostFromText;
 
   const totalComponentCost = toNumber(componentCostResult.total_component_cost, 0);
   const storedBaseCost = toNumber(product.b_cost, 0);
   const baseCost = totalComponentCost > 0 ? totalComponentCost : storedBaseCost;
-
   const currentPrice = toNumber(product.c_price, 0);
 
- const competitorFromMarket = toNumber(marketResult.average_market_price, 0);
-const competitorFromList = getAverageFromCompetitorsPrices(product.competitors_prices);
-const competitorFromProduct = toNumber(product.comp_price, 0);
+  const competitorFromMarket = toNumber(marketResult.average_market_price, 0);
+  const competitorFromList = getAverageFromCompetitorsPrices(product.competitors_prices);
+  const competitorFromProduct = toNumber(product.comp_price, 0);
 
-const competitorAveragePrice =
-  competitorFromMarket > 0
-    ? competitorFromMarket
-    : competitorFromList > 0
-    ? competitorFromList
-    : competitorFromProduct;
+  const competitorAveragePrice =
+    competitorFromMarket > 0
+      ? competitorFromMarket
+      : competitorFromList > 0
+      ? competitorFromList
+      : competitorFromProduct;
 
   return {
     id: product.id,
@@ -390,15 +434,26 @@ const competitorAveragePrice =
     market_sample_size: marketResult.market_sample_size,
 
     target_margin: targetMarginRule
-      ? toNumber(targetMarginRule.pricing_rules?.value, null)
+      ? toNumber(targetMarginRule.value, null)
       : null,
 
     season: activeSeason?.season_name || "Unknown",
+    active_season: activeSeason || null,
+
+    product_rules: productRules,
+    category_rules: categoryRules,
+    season_rules: activeSeasonRules,
+
     fixed_variable_cost_ratio: 0,
 
     components: componentCostResult.components,
     market_rows: marketResult.market_rows,
-    pricing_rules: assignedRules,
+
+    pricing_rules: {
+      product_rules: productRules,
+      category_rules: categoryRules,
+      season_rules: activeSeasonRules,
+    },
   };
 }
 

@@ -102,9 +102,12 @@ export async function analyzeSingleProduct(req, res, next) {
           sample_size: productInput.market_sample_size,
         },
         rules: {
-          target_margin: productInput.target_margin,
-        },
-        season: productInput.season,
+  target_margin: productInput.target_margin,
+  product_rules: productInput.product_rules || [],
+  category_rules: productInput.category_rules || [],
+  season_rules: productInput.season_rules || [],
+},
+season: productInput.active_season || productInput.season,
         analysis,
       },
     });
