@@ -198,6 +198,34 @@ export async function getAIPriceRecommendation(req, res, next) {
       };
     }
 
+    const marginRule =
+  productInput.product_rules?.find((rule) =>
+    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
+  ) ||
+  productInput.category_rules?.find((rule) =>
+    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
+  ) ||
+  productInput.season_rules?.find((rule) =>
+    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
+  );
+
+const marginPercent = Number(marginRule?.value || 30);
+
+const minimumSafePrice = Number(
+  (productInput.base_cost * (1 + marginPercent / 100)).toFixed(2)
+);
+
+if (
+  !aiRecommendation.recommended_price ||
+  aiRecommendation.recommended_price < minimumSafePrice
+) {
+  aiRecommendation.recommended_price = minimumSafePrice;
+  aiRecommendation.recommendation_type =
+    minimumSafePrice > productInput.current_price ? "increase" : "maintain";
+  aiRecommendation.reason =
+    `Adjusted to protect at least ${marginPercent}% margin based on product cost.`;
+}
+
     await updateRecommendedPriceById(
   productInput.product_id,
   userId,

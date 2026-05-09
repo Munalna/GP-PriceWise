@@ -380,9 +380,12 @@ const componentHelpText =
                               >
                                 {comps.length > 0
                                   ? comps.map((c, i) => (
-                                      <span key={i} style={compBadgeStyle}>
-                                        {c.name} {c.qty}
-                                      </span>
+                                      <div key={i} style={recipeRowMini}>
+  <span style={recipeNameMini}>{c.name}</span>
+  <span style={recipeQtyMini}>
+    {c.qty} {getComponentUnit(c.name)}
+  </span>
+</div>
                                     ))
                                   : "—"}
                               </div>
@@ -1388,6 +1391,29 @@ const activeCompBox = {
   backgroundColor: "#5b2d89",
   color: "white",
   borderColor: "#5b2d89",
+};
+
+const recipeRowMini = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "10px",
+  padding: "4px 0",
+  borderBottom: "1px dashed #eee",
+  minWidth: "180px",
+};
+
+const recipeNameMini = {
+  color: "#2d1b4e",
+  fontWeight: "700",
+  fontSize: "12px",
+};
+
+const recipeQtyMini = {
+  color: "#666",
+  fontWeight: "700",
+  fontSize: "12px",
+  whiteSpace: "nowrap",
 };
 
 const selectedRecipeChip = {
