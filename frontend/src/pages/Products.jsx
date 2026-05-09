@@ -119,14 +119,24 @@ function Products() {
   };
 
   const updateQty = (name, val, isEdit = false) => {
-    const target = isEdit ? selectedProduct : newProd;
-    const intVal = Math.max(0, parseInt(val, 10) || 0);
-    const updatedComps = target.components.map((c) =>
-      c.name === name ? { ...c, qty: intVal } : c
-    );
-    if (isEdit) setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    else setNewProd({ ...newProd, components: updatedComps });
-  };
+  const target = isEdit ? selectedProduct : newProd;
+
+  let newValue = val;
+
+  if (val !== "") {
+    newValue = Math.max(0, Number(val));
+  }
+
+  const updatedComps = target.components.map((c) =>
+    c.name === name ? { ...c, qty: newValue } : c
+  );
+
+  if (isEdit) {
+    setSelectedProduct({ ...selectedProduct, components: updatedComps });
+  } else {
+    setNewProd({ ...newProd, components: updatedComps });
+  }
+};
 
   const handleAddNewCategory = async () => {
     if (!newCatName) return;
@@ -238,6 +248,19 @@ function Products() {
       await invalidate();
     } catch (err) { setError(err.message); }
   };
+
+  const getComponentUnit = (name) => {
+  const comp = varComponents.find((c) => c.name === name);
+  return comp?.unit || "";
+};
+
+const getComponentCostPerUnit = (name) => {
+  const comp = varComponents.find((c) => c.name === name);
+  return Number(comp?.cost_per_unit || 0);
+};
+
+const componentHelpText =
+  "Select the ingredients used in ONE product recipe, then enter the amount used. Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.";
 
   return (
     <div style={pageContainer}>
@@ -357,9 +380,12 @@ function Products() {
                               >
                                 {comps.length > 0
                                   ? comps.map((c, i) => (
-                                      <span key={i} style={compBadgeStyle}>
-                                        {c.name} {c.qty}
-                                      </span>
+                                      <div key={i} style={recipeRowMini}>
+  <span style={recipeNameMini}>{c.name}</span>
+  <span style={recipeQtyMini}>
+    {c.qty} {getComponentUnit(c.name)}
+  </span>
+</div>
                                     ))
                                   : "—"}
                               </div>
@@ -664,7 +690,18 @@ function Products() {
 
             <div style={inputGroup}>
   <label style={labelStyle}>
+
   Components <span style={requiredStar}>*</span>
+
+  <span className="help-icon" style={helpIcon}>
+  ?
+  <span className="tooltip" style={tooltipBox}>
+    Select the ingredients used in ONE product recipe, then enter the amount used.
+    <br />
+    Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.
+  </span>
+</span>
+
 </label>
 
   <input
@@ -707,31 +744,36 @@ function Products() {
   <div style={selectedComponentsBox}>
     {newProd.components.length > 0 ? (
       newProd.components.map((comp) => (
-        <div key={comp.name} style={selectedComponentChip}>
-          <span>{comp.name}</span>
+        <div key={comp.name} style={selectedRecipeChip}>
+  <span style={selectedRecipeName}>{comp.name}</span>
 
-          <input
-            type="number"
-            min="1"
-            style={qtyInputSmall}
-            value={comp.qty}
-            onChange={(e) => updateQty(comp.name, e.target.value, false)}
-          />
+  <input
+    type="number"
+    min="0"
+    style={recipeQtyInput}
+    value={comp.qty}
+    onChange={(e) => updateQty(comp.name, e.target.value, false)}
+  />
 
-          <button
-            style={removeChipBtn}
-            onClick={() =>
-              setNewProd({
-                ...newProd,
-                components: newProd.components.filter(
-                  (c) => c.name !== comp.name
-                ),
-              })
-            }
-          >
-            ×
-          </button>
-        </div>
+  <span style={recipeUnitText}>
+    {getComponentUnit(comp.name)}
+  </span>
+
+  <button
+    type="button"
+    style={removeRecipeChipBtn}
+    onClick={() =>
+      setNewProd({
+        ...newProd,
+        components: newProd.components.filter(
+          (c) => c.name !== comp.name
+        ),
+      })
+    }
+  >
+    ×
+  </button>
+</div>
       ))
     ) : (
       <span style={{ color: "#999", fontSize: "13px" }}>
@@ -826,39 +868,56 @@ function Products() {
                 />
               </div>
 
-              <div style={inputGroup}>
-                <label style={labelStyle}>Components</label>
-                <div style={compSelectionGrid}>
-                  {varComponents.map((comp) => {
-                    const isSelected = selectedProduct.components?.find(
-                      (c) => c.name === comp.name
-                    );
+<div style={inputGroup}>
+  <label style={labelStyle}>
+    Components
+  <span className="help-icon" style={helpIcon}>
+  ?
+  <span className="tooltip" style={tooltipBox}>
+    Select the ingredients used in ONE product recipe, then enter the amount used.
+    <br />
+    Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.
+  </span>
+</span>
+  </label>
 
-                    return (
-                      <div key={comp.id} style={compItemWrapper}>
-                        <div
-                          onClick={() => toggleComponent(comp.name, true)}
-                          style={isSelected ? activeCompBox : inactiveCompBox}
-                        >
-                          {comp.name}
-                        </div>
+  <div style={compSelectionGrid}>
+    {varComponents.map((comp) => {
+      const isSelected = selectedProduct.components?.find(
+        (c) => c.name === comp.name
+      );
 
-                        {isSelected && (
-                          <input
-                            type="number"
-                            min="0"
-                            style={qtyInputSmall}
-                            value={isSelected.qty}
-                            onChange={(e) =>
-                              updateQty(comp.name, e.target.value, true)
-                            }
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+      return (
+        <div key={comp.id} style={recipeComponentCard(isSelected)}>
+          <div
+            onClick={() => toggleComponent(comp.name, true)}
+            style={recipeComponentName(isSelected)}
+          >
+            {comp.name}
+          </div>
+
+          {isSelected && (
+            <>
+              <input
+                type="number"
+                min="0"
+                style={recipeQtyInput}
+                value={isSelected.qty}
+                onChange={(e) =>
+                  updateQty(comp.name, e.target.value, true)
+                }
+              />
+
+              <span style={recipeUnitText}>
+                {comp.unit}
+              </span>
+            </>
+          )}
+        </div>
+      );
+    })}
+  </div>
+</div>
 
               <div style={inputGroup}>
                 <label style={labelStyle}>
@@ -1334,6 +1393,59 @@ const activeCompBox = {
   borderColor: "#5b2d89",
 };
 
+const recipeRowMini = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "10px",
+  padding: "4px 0",
+  borderBottom: "1px dashed #eee",
+  minWidth: "180px",
+};
+
+const recipeNameMini = {
+  color: "#2d1b4e",
+  fontWeight: "700",
+  fontSize: "12px",
+};
+
+const recipeQtyMini = {
+  color: "#666",
+  fontWeight: "700",
+  fontSize: "12px",
+  whiteSpace: "nowrap",
+};
+
+const selectedRecipeChip = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  backgroundColor: "#f9f6ff",
+  border: "2px solid #5b2d89",
+  color: "#2d1b4e",
+  padding: "8px",
+  borderRadius: "12px",
+  fontWeight: "700",
+};
+
+const selectedRecipeName = {
+  backgroundColor: "#5b2d89",
+  color: "white",
+  padding: "8px 12px",
+  borderRadius: "9px",
+  whiteSpace: "nowrap",
+};
+
+const removeRecipeChipBtn = {
+  border: "none",
+  backgroundColor: "transparent",
+  color: "#5b2d89",
+  fontSize: "18px",
+  cursor: "pointer",
+  lineHeight: "1",
+  fontWeight: "900",
+};
+
 const inactiveCompBox = {
   ...baseCompBox,
   backgroundColor: "#f9f9f9",
@@ -1471,6 +1583,36 @@ const selectedComponentChip = {
   fontWeight: "600",
 };
 
+const helpIcon = {
+  marginLeft: "6px",
+  backgroundColor: "#eee",
+  color: "#5b2d89",
+  borderRadius: "50%",
+  padding: "2px 7px",
+  fontSize: "12px",
+  cursor: "help",
+  fontWeight: "bold",
+  position: "relative",
+};
+
+const tooltipBox = {
+  visibility: "hidden",
+  opacity: 0,
+  position: "absolute",
+  left: 24,
+  top: -8,
+  width: 360,
+  background: "#111827",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.6,
+  zIndex: 10000,
+  transition: "opacity 0.2s ease",
+};
+
 const removeChipBtn = {
   border: "none",
   backgroundColor: "transparent",
@@ -1478,6 +1620,41 @@ const removeChipBtn = {
   fontSize: "18px",
   cursor: "pointer",
   lineHeight: "1",
+};
+
+const recipeComponentCard = (isSelected) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "8px",
+  borderRadius: "12px",
+  border: isSelected ? "2px solid #5b2d89" : "1px solid #ddd",
+  backgroundColor: isSelected ? "#f9f6ff" : "#fff",
+});
+
+const recipeComponentName = (isSelected) => ({
+  padding: "8px 12px",
+  borderRadius: "9px",
+  cursor: "pointer",
+  fontWeight: "700",
+  backgroundColor: isSelected ? "#5b2d89" : "#f9f9f9",
+  color: isSelected ? "#fff" : "#777",
+  whiteSpace: "nowrap",
+});
+
+const recipeQtyInput = {
+  width: "70px",
+  padding: "7px",
+  borderRadius: "8px",
+  border: "2px solid #5b2d89",
+  textAlign: "center",
+  fontWeight: "bold",
+};
+
+const recipeUnitText = {
+  fontSize: "12px",
+  color: "#5b2d89",
+  fontWeight: "800",
 };
 
 const requiredStar = {
