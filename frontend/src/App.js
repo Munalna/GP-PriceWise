@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
+import { useAuth } from './context/AuthContext';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -17,9 +18,11 @@ const Analytics = lazy(() => import('./components/sales/Analytics'));
 const PricingRules = lazy(() => import('./pages/PricingRules'));
 
 const ProtectedRoute = ({ children }) => {
-  const saved = localStorage.getItem('supabase_token');
-  const token = saved ? JSON.parse(saved) : null;
-  if (!token) return <Navigate to="/login" replace />;
+  const { user, loading } = useAuth();
+
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+
   return children;
 };
 

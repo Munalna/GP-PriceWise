@@ -39,11 +39,9 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-supabase.auth.onAuthStateChange((event) => {
-  if (event === "SIGNED_OUT") {
-    cachedToken = null;
-    tokenExpiry = null;
-  }
+supabase.auth.onAuthStateChange(() => {
+  cachedToken = null;
+  tokenExpiry = null;
 });
 
 export default api;

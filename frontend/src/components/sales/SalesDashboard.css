@@ -110,6 +110,45 @@
   padding: 14px;
 }
 
+.sales-import-steps {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sales-import-step {
+  align-items: center;
+  background: #f8f9fc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.sales-import-step.is-active,
+.sales-import-step.is-complete {
+  background: #f4eef8;
+  border-color: #e6d8ee;
+  color: #7B4B94;
+}
+
+.sales-step-number {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
 .sales-file-drop input {
   height: 1px;
   opacity: 0;
@@ -204,6 +243,10 @@
   font-weight: 800;
 }
 
+.sales-field .sales-required {
+  color: #dc2626;
+}
+
 .sales-field select {
   background: #ffffff;
   border: 1px solid #d9dee7;
@@ -230,6 +273,31 @@
 .sales-primary-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.sales-import-success {
+  color: #047857;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 12px 0 0;
+}
+
+.sales-missing-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.sales-missing-product {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 10px;
 }
 
 .sales-kpi-grid {
