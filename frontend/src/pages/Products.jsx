@@ -5,8 +5,6 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
 
-const API_URL = "/api/products";
-
 function Products() {
   const { user } = useAuth();
   const userId = user?.id;
@@ -15,23 +13,21 @@ function Products() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
   const { data: categories = [], isLoading: loadingCats } = useQuery({
-    queryKey: ["products"],
-    queryFn: () =>
-      fetch(API_URL, { headers: { "user-id": userId } }).then(r => r.json()),
+    queryKey: ["products", userId],
+    queryFn: () => api.get("/products").then((r) => r.data),
     enabled: !!userId,
     staleTime: 1000 * 60 * 3,
   });
 
   const { data: varComponents = [], isLoading: loadingVC } = useQuery({
-    queryKey: ["varComponents"],
-    queryFn: () =>
-      fetch(`${API_URL}/var-components`, { headers: { "user-id": userId } }).then(r => r.json()),
+    queryKey: ["varComponents", userId],
+    queryFn: () => api.get("/products/var-components").then((r) => r.data),
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: pricingRules = [] } = useQuery({
-    queryKey: ["pricingRules"],
+    queryKey: ["pricingRules", userId],
     queryFn: () => api.get("/pricing-rules").then(r => r.data),
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
@@ -40,6 +36,7 @@ function Products() {
   const loading = loadingCats || loadingVC;
 
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
   const [riskResult, setRiskResult] = useState(null);
   const [showRiskModal, setShowRiskModal] = useState(false);
@@ -48,12 +45,14 @@ function Products() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showCategoryInput, setShowCategoryInput] = useState(false);
+  const [showEditCategoryInput, setShowEditCategoryInput] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [productIdToDelete, setProductIdToDelete] = useState(null);
   const [marketCheck, setMarketCheck] = useState(null);
   const [componentSearch, setComponentSearch] = useState("");
   const [newProd, setNewProd] = useState({ name: "", components: [], category_id: "" });
   const [newCatName, setNewCatName] = useState("");
+  const [editCatName, setEditCatName] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
@@ -138,98 +137,122 @@ function Products() {
   }
 };
 
-  const handleAddNewCategory = async () => {
-    if (!newCatName) return;
+  const handleAddNewCategory = async (target = "add") => {
+    const categoryName = target === "edit" ? editCatName : newCatName;
+    if (!categoryName?.trim()) {
+      return setModalError("Category name is required.");
+    }
+
     try {
-      const res = await fetch(`${API_URL}/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({ name: newCatName }),
+      setModalError("");
+      const { data: category } = await api.post("/products/categories", {
+        name: categoryName.trim(),
       });
-      if (res.ok) { await invalidate(); setNewCatName(""); setShowCategoryInput(false); }
-    } catch (err) { setError("Error adding category"); }
+      await invalidate();
+
+      if (target === "edit") {
+        setSelectedProduct((current) => ({
+          ...current,
+          category_id: category.id,
+        }));
+        setEditCatName("");
+        setShowEditCategoryInput(false);
+      } else {
+        setNewProd((current) => ({
+          ...current,
+          category_id: category.id,
+        }));
+        setNewCatName("");
+        setShowCategoryInput(false);
+      }
+    } catch (err) { setModalError(err.response?.data?.error || "Error adding category"); }
   };
 
   const handleSaveProduct = async () => {
-    if (!newProd.name.trim())        return setError("Product name is required.");
-    if (!newProd.category_id)        return setError("Category is required.");
-    if (!newProd.components?.length) return setError("At least one component is required.");
+    if (!newProd.name.trim())        return setModalError("Product name is required.");
+    if (!newProd.category_id)        return setModalError("Category is required.");
+    if (!newProd.components?.length) return setModalError("At least one component is required.");
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({
+      setModalError("");
+      await api.post("/products", {
           ...newProd,
           components: JSON.stringify(newProd.components),
           v_cost: calculateTotalVcost(newProd.components).toString(),
           b_cost: "0.00", c_price: "0.00", comp_price: "0.00",
-        }),
-      });
-      if (res.ok) { await invalidate(); setShowAddModal(false); setNewProd({ name: "", components: [], category_id: "" }); }
-    } catch (err) { setError("Error saving product"); }
+        });
+      await invalidate();
+      setShowAddModal(false);
+      setModalError("");
+      setNewProd({ name: "", components: [], category_id: "" });
+    } catch (err) { setModalError(err.response?.data?.error || "Error saving product"); }
   };
 
   const handleUpdateProduct = async () => {
-    if (!selectedProduct.name?.trim()) return setError("Product name is required.");
-    if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return setError("Current price is required.");
-    if (Number(selectedProduct.c_price) < 0) return setError("Current price cannot be negative.");
+    if (!selectedProduct.name?.trim()) return setModalError("Product name is required.");
+    if (!selectedProduct.category_id) return setModalError("Category is required.");
+    if (!selectedProduct.components?.length) return setModalError("At least one component is required.");
+    if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return setModalError("Current price is required.");
+    if (Number(selectedProduct.c_price) < 0) return setModalError("Current price cannot be negative.");
+    const draftIsComplete =
+      Boolean(selectedProduct.name?.trim()) &&
+      Boolean(selectedProduct.category_id) &&
+      Array.isArray(selectedProduct.components) &&
+      selectedProduct.components.length > 0 &&
+      selectedProduct.c_price !== "" &&
+      selectedProduct.c_price != null &&
+      Number(selectedProduct.c_price) >= 0;
+
     try {
-      const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({
+      setModalError("");
+      await api.put(`/products/${selectedProduct.id}`, {
           ...selectedProduct,
+          product_id: selectedProduct.id,
+          category_id: selectedProduct.category_id,
           components: JSON.stringify(selectedProduct.components),
           v_cost: calculateTotalVcost(selectedProduct.components).toString(),
           c_price: selectedProduct.c_price,
           comp_price: selectedProduct.comp_price,
           b_cost: selectedProduct.b_cost,
-        }),
-      });
-      if (res.ok) { await invalidate(); setShowEditModal(false); }
-    } catch (err) { setError("Error updating product"); }
+          is_new: selectedProduct.is_new ? !draftIsComplete : selectedProduct.is_new,
+        });
+      await invalidate();
+      setShowEditModal(false);
+      setModalError("");
+      setEditCatName("");
+      setShowEditCategoryInput(false);
+    } catch (err) {
+      console.error("Error updating product:", err);
+      setModalError(err.response?.data?.error || err.message || "Error updating product");
+    }
   };
 
   const confirmDelete = async () => {
     if (!productIdToDelete) return;
     try {
-      const res = await fetch(`${API_URL}/${productIdToDelete}`, {
-        method: "DELETE",
-        headers: { "user-id": userId },
-      });
-      if (res.ok) { await invalidate(); setShowDeleteConfirm(false); setProductIdToDelete(null); }
-    } catch (err) { setError("Error deleting product"); }
+      await api.delete(`/products/${productIdToDelete}`);
+      await invalidate();
+      setShowDeleteConfirm(false);
+      setProductIdToDelete(null);
+    } catch (err) { setError(err.response?.data?.error || "Error deleting product"); }
   };
 
   const handleSaveRules = async () => {
     const targetType = selectedProduct ? "products" : "categories";
     const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
     try {
-      const res = await fetch(`${API_URL}/${targetType}/${targetId}/rules`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({ rules: tempSelectedRules }),
-      });
-      if (res.ok) {
-        if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
-        await invalidate();
-        setShowRulesModal(false);
-        alert("Pricing rules assigned successfully.");
-      }
-    } catch (err) { setError("Error saving rules"); }
+      await api.put(`/products/${targetType}/${targetId}/rules`, { rules: tempSelectedRules });
+      if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+      await invalidate();
+      setShowRulesModal(false);
+      alert("Pricing rules assigned successfully.");
+    } catch (err) { setError(err.response?.data?.error || "Error saving rules"); }
   };
 
   const handleRenameCategory = async (cat) => {
     const newName = prompt("Enter new category name:", cat.name);
     if (!newName?.trim()) return;
     try {
-      const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "user-id": userId },
-        body: JSON.stringify({ name: newName.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error renaming category");
+      await api.put(`/products/categories/${cat.id}`, { name: newName.trim() });
       await invalidate();
     } catch (err) { setError(err.message); }
   };
@@ -237,16 +260,9 @@ function Products() {
   const handleDeleteCategory = async (cat) => {
     if (!window.confirm(`Delete category "${cat.name}"?`)) return;
     try {
-      const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-        method: "DELETE",
-        headers: { "user-id": userId },
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Error deleting category");
-      }
+      await api.delete(`/products/categories/${cat.id}`);
       await invalidate();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.response?.data?.error || err.message); }
   };
 
   const getComponentUnit = (name) => {
@@ -266,12 +282,18 @@ const componentHelpText =
     <div style={pageContainer}>
       <div style={headerStyle}>
         <h1 style={mainTitle}>Products Management</h1>
-        <button style={btnMainAdd} onClick={() => setShowAddModal(true)}>
+        <button
+          style={btnMainAdd}
+          onClick={() => {
+            setModalError("");
+            setShowAddModal(true);
+          }}
+        >
           + Add Product
         </button>
       </div>
 
-      {error && (
+      {error && !showAddModal && !showEditModal && (
         <Alert variant="danger" onClose={() => setError("")} dismissible>
           {error}
         </Alert>
@@ -303,7 +325,10 @@ const componentHelpText =
 
         <button
           style={categoryEditBtn}
-          onClick={() => handleRenameCategory(cat)}
+          disabled={cat.is_virtual}
+          onClick={() => {
+            if (!cat.is_virtual) handleRenameCategory(cat);
+          }}
           title="Rename Category"
         >
           ✏️
@@ -311,7 +336,10 @@ const componentHelpText =
 
         <button
           style={categoryDeleteBtn}
-          onClick={() => handleDeleteCategory(cat)}
+          disabled={cat.is_virtual}
+          onClick={() => {
+            if (!cat.is_virtual) handleDeleteCategory(cat);
+          }}
           title="Delete Category"
         >
           🗑️
@@ -329,7 +357,9 @@ const componentHelpText =
 
                   <button
                     style={btnAssignRules}
+                    disabled={cat.is_virtual}
                     onClick={() => {
+                      if (cat.is_virtual) return;
                       setSelectedCategory(cat);
                       setSelectedProduct(null);
                       setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
@@ -362,7 +392,18 @@ const componentHelpText =
                         return (
                           <tr key={prod.id}>
                             <td style={tdStyle}>
-                              <div style={prodNameText}>{prod.name}</div>
+                              <div style={productNameRow}>
+                                <span style={prodNameText}>{prod.name}</span>
+                                {prod.is_new && (
+                                  <span
+                                    style={draftWarningBadge}
+                                    title="Action required: Please complete product components and details."
+                                  >
+                                    <i className="bi bi-exclamation-triangle-fill" />
+                                    Action required
+                                  </span>
+                                )}
+                              </div>
                               {(prod.rules || []).map((r, i) => (
   <div key={r.id || i} style={blueBadgeSmall}>
     {r.name}
@@ -453,6 +494,9 @@ const componentHelpText =
                                       ...prod,
                                       components: comps,
                                     });
+                                    setModalError("");
+                                    setEditCatName("");
+                                    setShowEditCategoryInput(false);
                                     setShowEditModal(true);
                                   }}
                                 >
@@ -654,6 +698,17 @@ const componentHelpText =
           <div style={modalContentCustom}>
             <h2 style={modalTitleCustom}>Add New Product</h2>
 
+            {modalError && (
+              <Alert
+                variant="danger"
+                onClose={() => setModalError("")}
+                dismissible
+                style={formAlertStyle}
+              >
+                {modalError}
+              </Alert>
+            )}
+
             <div style={inputGroup}>
               <label style={labelStyle}>
 
@@ -795,11 +850,13 @@ const componentHelpText =
                 }
               >
                 <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {categories
+                  .filter((c) => !c.is_virtual)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
               </select>
 
               {!showCategoryInput ? (
@@ -823,7 +880,7 @@ const componentHelpText =
                       padding: "5px 15px",
                       marginLeft: 0,
                     }}
-                    onClick={handleAddNewCategory}
+                    onClick={() => handleAddNewCategory("add")}
                   >
                     Add
                   </button>
@@ -837,7 +894,10 @@ const componentHelpText =
               </button>
               <button
                 style={btnCancelCustom}
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  setModalError("");
+                }}
               >
                 Cancel
               </button>
@@ -850,6 +910,17 @@ const componentHelpText =
         <div style={modalOverlay}>
           <div style={modalContentLarge}>
             <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+
+            {modalError && (
+              <Alert
+                variant="danger"
+                onClose={() => setModalError("")}
+                dismissible
+                style={formAlertStyle}
+              >
+                {modalError}
+              </Alert>
+            )}
 
             <div style={gridTwoCols}>
               <div style={inputGroup}>
@@ -870,7 +941,7 @@ const componentHelpText =
 
 <div style={inputGroup}>
   <label style={labelStyle}>
-    Components
+    Components <span style={requiredStar}>*</span>
   <span className="help-icon" style={helpIcon}>
   ?
   <span className="tooltip" style={tooltipBox}>
@@ -964,6 +1035,59 @@ const componentHelpText =
               </div>
 
               <div style={inputGroup}>
+                <label style={labelStyle}>
+                  Category <span style={requiredStar}>*</span>
+                </label>
+                <select
+                  style={inputFieldCustom}
+                  value={selectedProduct.category_id || ""}
+                  onChange={(e) =>
+                    setSelectedProduct({
+                      ...selectedProduct,
+                      category_id: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Select Category</option>
+                  {categories
+                    .filter((c) => !c.is_virtual)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+
+                {!showEditCategoryInput ? (
+                  <button
+                    style={btnLink}
+                    onClick={() => setShowEditCategoryInput(true)}
+                  >
+                    + New Category
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
+                    <input
+                      style={{ ...inputFieldCustom, marginBottom: 0 }}
+                      placeholder="Enter Category Name..."
+                      value={editCatName}
+                      onChange={(e) => setEditCatName(e.target.value)}
+                    />
+                    <button
+                      style={{
+                        ...btnMainAdd,
+                        padding: "5px 15px",
+                        marginLeft: 0,
+                      }}
+                      onClick={() => handleAddNewCategory("edit")}
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div style={inputGroup}>
                 <label style={labelStyle}>Variable Cost</label>
                 <input
                   style={{ ...inputFieldCustom, backgroundColor: "#f9f9f9" }}
@@ -979,7 +1103,12 @@ const componentHelpText =
               </button>
               <button
                 style={btnCancelCustom}
-                onClick={() => setShowEditModal(false)}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setModalError("");
+                  setEditCatName("");
+                  setShowEditCategoryInput(false);
+                }}
               >
                 Cancel
               </button>
@@ -1161,6 +1290,27 @@ const blueBadgeSmall = {
   display: "inline-block",
 };
 
+const productNameRow = {
+  alignItems: "center",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+};
+
+const draftWarningBadge = {
+  alignItems: "center",
+  backgroundColor: "#fff7ed",
+  border: "1px solid #fed7aa",
+  borderRadius: "999px",
+  color: "#9a3412",
+  display: "inline-flex",
+  fontSize: "11px",
+  fontWeight: "800",
+  gap: "5px",
+  lineHeight: 1,
+  padding: "5px 8px",
+};
+
 const compBadgeStyle = {
   backgroundColor: "#f1f2f6",
   color: "#555",
@@ -1278,6 +1428,13 @@ const modalTitleCustom = {
   color: "#5b2d89",
   marginBottom: "25px",
   fontWeight: "700",
+};
+
+const formAlertStyle = {
+  borderRadius: "10px",
+  fontSize: "14px",
+  fontWeight: "600",
+  marginBottom: "18px",
 };
 
 const inputFieldCustom = {

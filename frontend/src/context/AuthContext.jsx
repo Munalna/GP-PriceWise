@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../client'; // keep this fix — unified import
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+    const queryClient = useQueryClient();
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -22,12 +24,13 @@ export const AuthProvider = ({ children }) => {
         getInitialSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            queryClient.clear();
             setUser(session?.user ?? null);
             setLoading(false);
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [queryClient]);
 
     return (
         <AuthContext.Provider value={{ user, loading }}>

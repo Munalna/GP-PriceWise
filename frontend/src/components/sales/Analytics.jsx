@@ -1,6 +1,44 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Label } from 'recharts';
+import api from '../../services/api';
+
+const wrapProductName = (name, maxLineLength = 12) => {
+    const words = String(name || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+
+    words.forEach((word) => {
+        if (word.length > maxLineLength) {
+            const chunks = word.match(new RegExp(`.{1,${maxLineLength}}`, 'g')) || [word];
+            chunks.forEach((chunk) => lines.push(chunk));
+            return;
+        }
+
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && `${lastLine} ${word}`.length <= maxLineLength) {
+            lines[lines.length - 1] = `${lastLine} ${word}`;
+        } else {
+            lines.push(word);
+        }
+    });
+
+    return lines.length > 0 ? lines : [''];
+};
+
+function ProductAxisTick({ x, y, payload }) {
+    const lines = wrapProductName(payload?.value);
+
+    return (
+        <g transform={`translate(${x},${y})`}>
+            <text textAnchor="middle" fill="#6b7280" fontSize={11}>
+                {lines.map((line, index) => (
+                    <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 12 : 13}>
+                        {line}
+                    </tspan>
+                ))}
+            </text>
+        </g>
+    );
+};
 
 export default function Analytics({ userId }) {
     const [chartData, setChartData] = useState([]);
@@ -16,7 +54,7 @@ export default function Analytics({ userId }) {
         setLoading(true);
         setError('');
 
-        axios.get(`/api/salesData/analytics?userId=${userId}`)
+        api.get('/salesData/analytics')
             .then(res => {
                 const normalizedData = Array.isArray(res.data)
                     ? res.data
@@ -119,11 +157,21 @@ export default function Analytics({ userId }) {
                     </div>
                     <div className="sales-chart-frame">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={bestSelling} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+                            <BarChart data={bestSelling} margin={{ top: 16, right: 16, left: 10, bottom: 28 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} height={54} />
-                                <YAxis tick={{ fontSize: 12 }} />
-                                <Tooltip />
+                                <XAxis
+                                    dataKey="name"
+                                    tick={<ProductAxisTick />}
+                                    interval={0}
+                                    minTickGap={8}
+                                    height={96}
+                                >
+                                    <Label value="Product" offset={-4} position="insideBottom" />
+                                </XAxis>
+                                <YAxis tick={{ fontSize: 12 }}>
+                                    <Label value="Unit" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
+                                </YAxis>
+                                <Tooltip labelFormatter={(label) => label} />
                                 <Bar dataKey="quantity" fill="#7B4B94" name="Quantity Sold" radius={[6, 6, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
@@ -136,15 +184,25 @@ export default function Analytics({ userId }) {
                             <h4>Lowest Selling Products</h4>
                             <p>Lowest quantities sold</p>
                         </div>
-                        <span className="sales-chart-badge warning">Review</span>
+                        <span className="sales-chart-badge warning">Lowest 5</span>
                     </div>
                     <div className="sales-chart-frame">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={lowSelling} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+                            <BarChart data={lowSelling} margin={{ top: 16, right: 16, left: 10, bottom: 28 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} height={54} />
-                                <YAxis tick={{ fontSize: 12 }} />
-                                <Tooltip />
+                                <XAxis
+                                    dataKey="name"
+                                    tick={<ProductAxisTick />}
+                                    interval={0}
+                                    minTickGap={8}
+                                    height={96}
+                                >
+                                    <Label value="Product" offset={-4} position="insideBottom" />
+                                </XAxis>
+                                <YAxis tick={{ fontSize: 12 }}>
+                                    <Label value="Unit" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
+                                </YAxis>
+                                <Tooltip labelFormatter={(label) => label} />
                                 <Bar dataKey="quantity" fill="#6f7478" name="Quantity Sold" radius={[6, 6, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
