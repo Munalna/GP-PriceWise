@@ -371,7 +371,9 @@ const componentHelpText =
                 </div>
 
                 {cat.products && cat.products.length > 0 ? (
-                  <table style={tableStyle}>
+                  <div style={tableScrollWrap}>
+
+  <table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Product Name</th>
@@ -519,6 +521,7 @@ const componentHelpText =
                       })}
                     </tbody>
                   </table>
+                  </div>
                 ) : (
                   <div style={emptyPlaceholderText}>
                     No products in this category.
@@ -1247,8 +1250,22 @@ const btnAssignRules = {
 };
 
 const tableStyle = {
+
   width: "100%",
+
+  minWidth: "980px",
+
   borderCollapse: "collapse",
+
+};
+const tableScrollWrap = {
+
+  width: "100%",
+
+  overflowX: "auto",
+
+  paddingBottom: "8px",
+
 };
 
 const thStyle = {
@@ -1365,15 +1382,14 @@ const actionBtnRed = {
 
 const modalOverlay = {
   position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100%",
-  height: "100%",
+  inset: 0,
   backgroundColor: "rgba(0,0,0,0.4)",
   display: "flex",
   justifyContent: "center",
-  alignItems: "center",
+  alignItems: "flex-start",
+  padding: "40px 16px",
   zIndex: 1000,
+  overflowY: "auto",
 };
 
 const categoryTitleRow = {
@@ -1407,11 +1423,14 @@ const modalContentCustom = {
   padding: "35px",
   borderRadius: "25px",
   width: "450px",
+  maxHeight: "90vh",
+  overflowY: "auto",
 };
 
 const modalContentLarge = {
   ...modalContentCustom,
   width: "750px",
+  maxWidth: "90vw",
 };
 
 const riskModalContent = {
