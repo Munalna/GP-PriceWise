@@ -11,15 +11,15 @@ function sar(n) {
 }
 
 function calcMargin(cost, recommended) {
-  if (!cost || cost === 0) return null;
-  return ((recommended - cost) / cost) * 100;
+  if (!recommended || recommended === 0) return null;
+  return ((recommended - cost) / recommended) * 100;
 }
 
 function MarginBadge({ margin }) {
   if (margin === null) return <span style={styles.badgeNeutral}>N/A</span>;
   const color =
-    margin >= 50 ? styles.badgeGreen :
-    margin >= 20 ? styles.badgeYellow :
+    margin >= 60 ? styles.badgeGreen :
+    margin >= 35 ? styles.badgeYellow :
     styles.badgeRed;
   return <span style={{ ...styles.badge, ...color }}>{margin.toFixed(0)}%</span>;
 }
@@ -28,10 +28,10 @@ function VsMarket({ recommended, competitor }) {
   if (!competitor || competitor === 0)
     return <span style={{ color: "#9ca3af", fontSize: 13 }}>N/A</span>;
   const diff = ((recommended - competitor) / competitor) * 100;
-  if (diff > 10)
-    return <span style={{ color: "#dc2626", fontWeight: 700, fontSize: 13 }}>▲ {diff.toFixed(0)}% above</span>;
-  if (diff < -10)
-    return <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>▼ {Math.abs(diff).toFixed(0)}% below</span>;
+  if (diff > 5)
+    return <span style={{ color: "#dc2626", fontWeight: 700, fontSize: 13 }}>Above Market</span>;
+  if (diff < -5)
+    return <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>Below Market</span>;
   return <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>✓ Competitive</span>;
 }
 

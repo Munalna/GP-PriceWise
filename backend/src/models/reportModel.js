@@ -104,7 +104,7 @@ export async function getFixedCostsByUser(userId) {
   return data || [];
 }
 
-export async function getActiveSeasonByUser(userId) {
+export async function getActiveSeasonsByUser(userId) {
   const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabaseAdmin
@@ -112,11 +112,10 @@ export async function getActiveSeasonByUser(userId) {
     .select("*")
     .eq("user_id", userId)
     .lte("start_date", today)
-    .gte("end_date", today)
-    .maybeSingle();
+    .gte("end_date", today);
 
   if (error) throw error;
-  return data || null;
+  return data || [];
 }
 
 export async function logExportReport(userId, format) {
