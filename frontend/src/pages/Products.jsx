@@ -56,6 +56,33 @@ function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [feedback, setFeedback] = useState({
+  type: "",
+  message: "",
+  location: "",
+});
+const FEEDBACK_DURATION = 5000;
+
+const showFeedback = (type, message, location) => {
+  setFeedback({ type, message, location });
+
+  setTimeout(() => {
+    setFeedback({ type: "", message: "", location: "" });
+  }, FEEDBACK_DURATION);
+};
+
+const showCategoryFeedback = (type, message) => {
+  setCategoryFeedback({ type, message });
+
+  setTimeout(() => {
+    setCategoryFeedback({ type: "", message: "" });
+  }, FEEDBACK_DURATION);
+};
+
+const [categoryFeedback, setCategoryFeedback] = useState({
+  type: "",
+  message: "",
+});
 
   const calculateAvg = (prices) => {
     if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
@@ -137,134 +164,295 @@ function Products() {
   }
 };
 
-  const handleAddNewCategory = async (target = "add") => {
-    const categoryName = target === "edit" ? editCatName : newCatName;
-    if (!categoryName?.trim()) {
-      return setModalError("Category name is required.");
+const handleAddNewCategory = async () => {
+  setCategoryFeedback({ type: "", message: "" });
+
+  if (!newCatName.trim()) {
+    showCategoryFeedback("danger", "Category name is required.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({ name: newCatName.trim() }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error adding category.");
     }
 
-    try {
-      setModalError("");
-      const { data: category } = await api.post("/products/categories", {
-        name: categoryName.trim(),
-      });
-      await invalidate();
+    await invalidate();
 
-      if (target === "edit") {
-        setSelectedProduct((current) => ({
-          ...current,
-          category_id: category.id,
-        }));
-        setEditCatName("");
-        setShowEditCategoryInput(false);
-      } else {
-        setNewProd((current) => ({
-          ...current,
-          category_id: category.id,
-        }));
-        setNewCatName("");
-        setShowCategoryInput(false);
-      }
-    } catch (err) { setModalError(err.response?.data?.error || "Error adding category"); }
-  };
+    setNewProd((prev) => ({
+      ...prev,
+      category_id: data.id || prev.category_id,
+    }));
 
-  const handleSaveProduct = async () => {
-    if (!newProd.name.trim())        return setModalError("Product name is required.");
-    if (!newProd.category_id)        return setModalError("Category is required.");
-    if (!newProd.components?.length) return setModalError("At least one component is required.");
-    try {
-      setModalError("");
-      await api.post("/products", {
-          ...newProd,
-          components: JSON.stringify(newProd.components),
-          v_cost: calculateTotalVcost(newProd.components).toString(),
-          b_cost: "0.00", c_price: "0.00", comp_price: "0.00",
-        });
-      await invalidate();
-      setShowAddModal(false);
-      setModalError("");
-      setNewProd({ name: "", components: [], category_id: "" });
-    } catch (err) { setModalError(err.response?.data?.error || "Error saving product"); }
-  };
+    setNewCatName("");
+    showCategoryFeedback("success", "Category added successfully.");
+  } catch (err) {
+    showCategoryFeedback("danger", err.message || "Error adding category.");
+  }
+};
 
-  const handleUpdateProduct = async () => {
-    if (!selectedProduct.name?.trim()) return setModalError("Product name is required.");
-    if (!selectedProduct.category_id) return setModalError("Category is required.");
-    if (!selectedProduct.components?.length) return setModalError("At least one component is required.");
-    if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return setModalError("Current price is required.");
-    if (Number(selectedProduct.c_price) < 0) return setModalError("Current price cannot be negative.");
-    const draftIsComplete =
-      Boolean(selectedProduct.name?.trim()) &&
-      Boolean(selectedProduct.category_id) &&
-      Array.isArray(selectedProduct.components) &&
-      selectedProduct.components.length > 0 &&
-      selectedProduct.c_price !== "" &&
-      selectedProduct.c_price != null &&
-      Number(selectedProduct.c_price) >= 0;
+const handleSaveProduct = async () => {
+  setFeedback({ type: "", message: "", location: "" });
 
-    try {
-      setModalError("");
-      await api.put(`/products/${selectedProduct.id}`, {
-          ...selectedProduct,
-          product_id: selectedProduct.id,
-          category_id: selectedProduct.category_id,
-          components: JSON.stringify(selectedProduct.components),
-          v_cost: calculateTotalVcost(selectedProduct.components).toString(),
-          c_price: selectedProduct.c_price,
-          comp_price: selectedProduct.comp_price,
-          b_cost: selectedProduct.b_cost,
-          is_new: selectedProduct.is_new ? !draftIsComplete : selectedProduct.is_new,
-        });
-      await invalidate();
-      setShowEditModal(false);
-      setModalError("");
-      setEditCatName("");
-      setShowEditCategoryInput(false);
-    } catch (err) {
-      console.error("Error updating product:", err);
-      setModalError(err.response?.data?.error || err.message || "Error updating product");
+  if (!newProd.name.trim()) {
+    showFeedback("danger", "Product name is required.", "add-product-modal");
+    return;
+  }
+
+  if (!newProd.category_id) {
+    showFeedback("danger", "Category is required.", "add-product-modal");
+    return;
+  }
+
+  if (!newProd.components?.length) {
+    showFeedback("danger", "At least one component is required.", "add-product-modal");
+    return;
+  }
+
+  if (newProd.components.some((c) => Number(c.qty) <= 0)) {
+    showFeedback("danger", "Each selected component must have a quantity greater than 0.", "add-product-modal");
+    return;
+  }
+
+  const addedProductCategoryId = newProd.category_id;
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({
+        ...newProd,
+        components: JSON.stringify(newProd.components),
+        v_cost: calculateTotalVcost(newProd.components).toString(),
+        b_cost: "0.00",
+        c_price: "0.00",
+        comp_price: "0.00",
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error saving product.");
     }
-  };
 
-  const confirmDelete = async () => {
-    if (!productIdToDelete) return;
-    try {
-      await api.delete(`/products/${productIdToDelete}`);
+    setShowAddModal(false);
+    setNewProd({ name: "", components: [], category_id: "" });
+    setMarketCheck(null);
+
+    showFeedback("success", "Product added successfully.", `category-${addedProductCategoryId}`);
+
+    setTimeout(async () => {
       await invalidate();
-      setShowDeleteConfirm(false);
-      setProductIdToDelete(null);
-    } catch (err) { setError(err.response?.data?.error || "Error deleting product"); }
-  };
+    }, 800);
+  } catch (err) {
+    showFeedback("danger", err.message || "Error saving product.", "add-product-modal");
+  }
+};
 
-  const handleSaveRules = async () => {
-    const targetType = selectedProduct ? "products" : "categories";
-    const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
-    try {
-      await api.put(`/products/${targetType}/${targetId}/rules`, { rules: tempSelectedRules });
-      if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+const handleUpdateProduct = async () => {
+  setFeedback({ type: "", message: "", location: "" });
+
+  if (!selectedProduct.name?.trim()) {
+    showFeedback("danger", "Product name is required.", "edit-product-modal");
+    return;
+  }
+
+  if (selectedProduct.c_price === "" || selectedProduct.c_price == null) {
+    showFeedback("danger", "Current price is required.", "edit-product-modal");
+    return;
+  }
+
+  if (Number(selectedProduct.c_price) < 0) {
+    showFeedback("danger", "Current price cannot be negative.", "edit-product-modal");
+    return;
+  }
+
+  if (selectedProduct.components?.some((c) => Number(c.qty) <= 0)) {
+    showFeedback("danger", "Each selected component must have a quantity greater than 0.", "edit-product-modal");
+    return;
+  }
+
+  const updatedProductCategoryId = selectedProduct.category_id;
+
+  try {
+    const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({
+        ...selectedProduct,
+        components: JSON.stringify(selectedProduct.components),
+        v_cost: calculateTotalVcost(selectedProduct.components).toString(),
+        c_price: selectedProduct.c_price,
+        comp_price: selectedProduct.comp_price,
+        b_cost: selectedProduct.b_cost,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error updating product.");
+    }
+
+    setShowEditModal(false);
+
+    showFeedback("success", "Product updated successfully.", `category-${updatedProductCategoryId}`);
+
+    setTimeout(async () => {
       await invalidate();
-      setShowRulesModal(false);
-      alert("Pricing rules assigned successfully.");
-    } catch (err) { setError(err.response?.data?.error || "Error saving rules"); }
-  };
+    }, 800);
+  } catch (err) {
+    showFeedback("danger", err.message || "Error updating product.", "edit-product-modal");
+  }
+};
 
-  const handleRenameCategory = async (cat) => {
-    const newName = prompt("Enter new category name:", cat.name);
-    if (!newName?.trim()) return;
-    try {
-      await api.put(`/products/categories/${cat.id}`, { name: newName.trim() });
+const confirmDelete = async () => {
+  if (!productIdToDelete) return;
+
+  setFeedback({ type: "", message: "", location: "" });
+
+  const deletedProductCategoryId = categories
+    .flatMap((cat) =>
+      (cat.products || []).map((prod) => ({
+        productId: prod.id,
+        categoryId: cat.id,
+      }))
+    )
+    .find((item) => item.productId === productIdToDelete)?.categoryId;
+
+  try {
+    const res = await fetch(`${API_URL}/${productIdToDelete}`, {
+      method: "DELETE",
+      headers: { "user-id": userId },
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error deleting product.");
+    }
+
+    setShowDeleteConfirm(false);
+    setProductIdToDelete(null);
+
+    showFeedback("success", "Product deleted successfully.", `category-${deletedProductCategoryId}`);
+
+    setTimeout(async () => {
       await invalidate();
-    } catch (err) { setError(err.message); }
-  };
+    }, 1200);
+  } catch (err) {
+    setShowDeleteConfirm(false);
+    showFeedback("danger", err.message || "Error deleting product.", `category-${deletedProductCategoryId}`);
+  }
+};
 
-  const handleDeleteCategory = async (cat) => {
-    if (!window.confirm(`Delete category "${cat.name}"?`)) return;
-    try {
-      await api.delete(`/products/categories/${cat.id}`);
+const handleSaveRules = async () => {
+  const targetType = selectedProduct ? "products" : "categories";
+  const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
+
+  try {
+    const res = await fetch(`${API_URL}/${targetType}/${targetId}/rules`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({ rules: tempSelectedRules }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error saving rules.");
+    }
+
+    if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+
+    setShowRulesModal(false);
+
+    showFeedback(
+      "success",
+      "Pricing rules assigned successfully.",
+      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
+    );
+
+    setTimeout(async () => {
       await invalidate();
-    } catch (err) { setError(err.response?.data?.error || err.message); }
-  };
+    }, 800);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.message || "Error saving rules.",
+      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
+    );
+  }
+};
 
+const handleRenameCategory = async (cat) => {
+  const newName = prompt("Enter new category name:", cat.name);
+  if (!newName?.trim()) return;
+
+  setFeedback({ type: "", message: "", location: "" });
+
+  try {
+    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "user-id": userId },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || "Error renaming category.");
+    }
+
+    showFeedback("success", "Category updated successfully.", `category-${cat.id}`);
+
+    setTimeout(async () => {
+      await invalidate();
+    }, 800);
+  } catch (err) {
+    showFeedback("danger", err.message || "Error updating category.", `category-${cat.id}`);
+  }
+};
+
+const handleDeleteCategory = async (cat) => {
+  if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+
+  setFeedback({ type: "", message: "", location: "" });
+
+  try {
+    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
+      method: "DELETE",
+      headers: { "user-id": userId },
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(
+        data.error ||
+          data.message ||
+          "This category cannot be deleted because it has products."
+      );
+    }
+
+    showFeedback("success", "Category deleted successfully.", `category-${cat.id}`);
+
+    setTimeout(async () => {
+      await invalidate();
+    }, 1200);
+  } catch (err) {
+    showFeedback("danger", err.message || "Error deleting category.", `category-${cat.id}`);
+  }
+};
   const getComponentUnit = (name) => {
   const comp = varComponents.find((c) => c.name === name);
   return comp?.unit || "";
@@ -293,7 +481,7 @@ const componentHelpText =
         </button>
       </div>
 
-      {error && !showAddModal && !showEditModal && (
+      {error && (
         <Alert variant="danger" onClose={() => setError("")} dismissible>
           {error}
         </Alert>
@@ -316,8 +504,9 @@ const componentHelpText =
           ) : categories.length === 0 ? (
             <div style={emptySimpleStyle}>There is no product yet</div>
           ) : (
-            categories.map((cat) => (
-              <div key={cat.id} style={categoryCard}>
+            categories.map((cat) => ( 
+            <div key={cat.id} style={categoryCard}> 
+
   <div style={categoryHeader}>
     <div>
       <div style={categoryTitleRow}>
@@ -370,7 +559,27 @@ const componentHelpText =
                   </button>
                 </div>
 
-                {cat.products && cat.products.length > 0 ? (
+ {feedback.location === `category-${cat.id}` && (
+
+    <Alert
+
+      variant={feedback.type}
+
+      onClose={() => setFeedback({ type: "", message: "", location: "" })}
+
+      dismissible
+
+      style={inlineAlertStyle}
+
+    >
+
+      {feedback.message}
+
+    </Alert>
+
+  )}
+  {cat.products && cat.products.length > 0 ? (
+
                   <div style={tableScrollWrap}>
 
   <table style={tableStyle}>
@@ -460,7 +669,20 @@ const componentHelpText =
                                 fontWeight: "600",
                               }}
                             >
-                              {calculateAvg(prod.competitors_prices)} SAR
+                             {Number(calculateAvg(prod.competitors_prices)) === 0 ? (
+  <span className="help-icon" style={competitorZeroHint}>
+    0.00 SAR
+    <span className="tooltip" style={competitorTooltipBox}>
+      No matching product was found in the market dataset.
+      <br />
+      The competitor average is shown as 0 SAR.
+    </span>
+  </span>
+) : (
+  <span>
+    {calculateAvg(prod.competitors_prices)} SAR
+  </span>
+)}
                             </td>
 
                             <td style={tdStyle}>
@@ -807,7 +1029,7 @@ const componentHelpText =
 
   <input
     type="number"
-    min="0"
+    min="1"
     style={recipeQtyInput}
     value={comp.qty}
     onChange={(e) => updateQty(comp.name, e.target.value, false)}
@@ -883,7 +1105,7 @@ const componentHelpText =
                       padding: "5px 15px",
                       marginLeft: 0,
                     }}
-                    onClick={() => handleAddNewCategory("add")}
+                    onClick={handleAddNewCategory}
                   >
                     Add
                   </button>
@@ -974,7 +1196,7 @@ const componentHelpText =
             <>
               <input
                 type="number"
-                min="0"
+                min="1"
                 style={recipeQtyInput}
                 value={isSelected.qty}
                 onChange={(e) =>
@@ -1223,6 +1445,7 @@ const categoryCard = {
   padding: "25px",
   marginBottom: "30px",
   boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+  overflow: "visible",
 };
 
 const categoryHeader = {
@@ -1240,7 +1463,7 @@ const catTitleText = {
 };
 
 const btnAssignRules = {
-  backgroundColor: "#f39c12",
+  backgroundColor: "#3498db",
   color: "white",
   border: "none",
   padding: "8px 18px",
@@ -1252,20 +1475,13 @@ const btnAssignRules = {
 const tableStyle = {
 
   width: "100%",
-
-  minWidth: "980px",
-
   borderCollapse: "collapse",
-
 };
 const tableScrollWrap = {
-
   width: "100%",
-
-  overflowX: "auto",
-
+  overflowX: "visible",
+  overflowY: "visible",
   paddingBottom: "8px",
-
 };
 
 const thStyle = {
@@ -1289,7 +1505,7 @@ const badgeRow = {
 };
 
 const orangeBadgeSmall = {
-  backgroundColor: "#f39c12",
+  backgroundColor: "#3498db",
   color: "white",
   fontSize: "10px",
   padding: "3px 8px",
@@ -1386,10 +1602,9 @@ const modalOverlay = {
   backgroundColor: "rgba(0,0,0,0.4)",
   display: "flex",
   justifyContent: "center",
-  alignItems: "flex-start",
-  padding: "40px 16px",
+  alignItems: "center",
+  padding: "24px",
   zIndex: 1000,
-  overflowY: "auto",
 };
 
 const categoryTitleRow = {
@@ -1422,15 +1637,16 @@ const modalContentCustom = {
   backgroundColor: "white",
   padding: "35px",
   borderRadius: "25px",
-  width: "450px",
+  width: "760px",
+  maxWidth: "90vw",
   maxHeight: "90vh",
   overflowY: "auto",
 };
 
 const modalContentLarge = {
   ...modalContentCustom,
-  width: "750px",
-  maxWidth: "90vw",
+  width: "980px",
+  maxWidth: "92vw",
 };
 
 const riskModalContent = {
@@ -1798,6 +2014,37 @@ const removeChipBtn = {
   lineHeight: "1",
 };
 
+const competitorPriceHint = {
+  position: "relative",
+  cursor: "help",
+  fontWeight: "700",
+};
+
+const competitorZeroHint = {
+  position: "relative",
+  cursor: "help",
+  color: "#e67e22",
+  fontWeight: "700",
+};
+
+const competitorTooltipBox = {
+  visibility: "hidden",
+  opacity: 0,
+  position: "absolute",
+  right: 0,
+  top: 28,
+  width: 260,
+  background: "#111827",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.6,
+  zIndex: 10000,
+  transition: "opacity 0.2s ease",
+};
+
 const recipeComponentCard = (isSelected) => ({
   display: "flex",
   alignItems: "center",
@@ -1836,6 +2083,12 @@ const recipeUnitText = {
 const requiredStar = {
   color: "#e74c3c",
   fontWeight: "bold",
+};
+
+const inlineAlertStyle = {
+  marginBottom: "16px",
+  borderRadius: "10px",
+  fontWeight: "600",
 };
 
 export default Products;
