@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
 
+const API_URL = "/api/products";
 function Products() {
   const { user } = useAuth();
   const userId = user?.id;
@@ -71,6 +72,11 @@ const showFeedback = (type, message, location) => {
   }, FEEDBACK_DURATION);
 };
 
+const [categoryFeedback, setCategoryFeedback] = useState({
+  type: "",
+  message: "",
+});
+
 const showCategoryFeedback = (type, message) => {
   setCategoryFeedback({ type, message });
 
@@ -79,10 +85,7 @@ const showCategoryFeedback = (type, message) => {
   }, FEEDBACK_DURATION);
 };
 
-const [categoryFeedback, setCategoryFeedback] = useState({
-  type: "",
-  message: "",
-});
+
 
   const calculateAvg = (prices) => {
     if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
@@ -173,76 +176,49 @@ const handleAddNewCategory = async () => {
   }
 
   try {
-    const res = await fetch(`${API_URL}/categories`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({ name: newCatName.trim() }),
+    const res = await api.post("/products/categories", {
+      name: newCatName.trim(),
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error adding category.");
-    }
 
     await invalidate();
 
     setNewProd((prev) => ({
       ...prev,
-      category_id: data.id || prev.category_id,
+      category_id: res.data?.id || prev.category_id,
     }));
 
     setNewCatName("");
     showCategoryFeedback("success", "Category added successfully.");
   } catch (err) {
-    showCategoryFeedback("danger", err.message || "Error adding category.");
+    showCategoryFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error adding category."
+    );
   }
 };
 
 const handleSaveProduct = async () => {
   setFeedback({ type: "", message: "", location: "" });
 
-  if (!newProd.name.trim()) {
-    showFeedback("danger", "Product name is required.", "add-product-modal");
-    return;
-  }
-
-  if (!newProd.category_id) {
-    showFeedback("danger", "Category is required.", "add-product-modal");
-    return;
-  }
-
-  if (!newProd.components?.length) {
-    showFeedback("danger", "At least one component is required.", "add-product-modal");
-    return;
-  }
+  if (!newProd.name.trim()) return showFeedback("danger", "Product name is required.", "add-product-modal");
+  if (!newProd.category_id) return showFeedback("danger", "Category is required.", "add-product-modal");
+  if (!newProd.components?.length) return showFeedback("danger", "At least one component is required.", "add-product-modal");
 
   if (newProd.components.some((c) => Number(c.qty) <= 0)) {
-    showFeedback("danger", "Each selected component must have a quantity greater than 0.", "add-product-modal");
-    return;
+    return showFeedback("danger", "Each selected component must have a quantity greater than 0.", "add-product-modal");
   }
 
   const addedProductCategoryId = newProd.category_id;
 
   try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({
-        ...newProd,
-        components: JSON.stringify(newProd.components),
-        v_cost: calculateTotalVcost(newProd.components).toString(),
-        b_cost: "0.00",
-        c_price: "0.00",
-        comp_price: "0.00",
-      }),
+    await api.post("/products", {
+      ...newProd,
+      components: JSON.stringify(newProd.components),
+      v_cost: calculateTotalVcost(newProd.components).toString(),
+      b_cost: "0.00",
+      c_price: "0.00",
+      comp_price: "0.00",
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error saving product.");
-    }
 
     setShowAddModal(false);
     setNewProd({ name: "", components: [], category_id: "" });
@@ -254,54 +230,36 @@ const handleSaveProduct = async () => {
       await invalidate();
     }, 800);
   } catch (err) {
-    showFeedback("danger", err.message || "Error saving product.", "add-product-modal");
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error saving product.",
+      "add-product-modal"
+    );
   }
 };
 
 const handleUpdateProduct = async () => {
   setFeedback({ type: "", message: "", location: "" });
 
-  if (!selectedProduct.name?.trim()) {
-    showFeedback("danger", "Product name is required.", "edit-product-modal");
-    return;
-  }
-
-  if (selectedProduct.c_price === "" || selectedProduct.c_price == null) {
-    showFeedback("danger", "Current price is required.", "edit-product-modal");
-    return;
-  }
-
-  if (Number(selectedProduct.c_price) < 0) {
-    showFeedback("danger", "Current price cannot be negative.", "edit-product-modal");
-    return;
-  }
+  if (!selectedProduct.name?.trim()) return showFeedback("danger", "Product name is required.", "edit-product-modal");
+  if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return showFeedback("danger", "Current price is required.", "edit-product-modal");
+  if (Number(selectedProduct.c_price) < 0) return showFeedback("danger", "Current price cannot be negative.", "edit-product-modal");
 
   if (selectedProduct.components?.some((c) => Number(c.qty) <= 0)) {
-    showFeedback("danger", "Each selected component must have a quantity greater than 0.", "edit-product-modal");
-    return;
+    return showFeedback("danger", "Each selected component must have a quantity greater than 0.", "edit-product-modal");
   }
 
   const updatedProductCategoryId = selectedProduct.category_id;
 
   try {
-    const res = await fetch(`${API_URL}/${selectedProduct.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({
-        ...selectedProduct,
-        components: JSON.stringify(selectedProduct.components),
-        v_cost: calculateTotalVcost(selectedProduct.components).toString(),
-        c_price: selectedProduct.c_price,
-        comp_price: selectedProduct.comp_price,
-        b_cost: selectedProduct.b_cost,
-      }),
+    await api.put(`/products/${selectedProduct.id}`, {
+      ...selectedProduct,
+      components: JSON.stringify(selectedProduct.components),
+      v_cost: calculateTotalVcost(selectedProduct.components).toString(),
+      c_price: selectedProduct.c_price,
+      comp_price: selectedProduct.comp_price,
+      b_cost: selectedProduct.b_cost,
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error updating product.");
-    }
 
     setShowEditModal(false);
 
@@ -311,7 +269,11 @@ const handleUpdateProduct = async () => {
       await invalidate();
     }, 800);
   } catch (err) {
-    showFeedback("danger", err.message || "Error updating product.", "edit-product-modal");
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error updating product.",
+      "edit-product-modal"
+    );
   }
 };
 
@@ -330,16 +292,7 @@ const confirmDelete = async () => {
     .find((item) => item.productId === productIdToDelete)?.categoryId;
 
   try {
-    const res = await fetch(`${API_URL}/${productIdToDelete}`, {
-      method: "DELETE",
-      headers: { "user-id": userId },
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error deleting product.");
-    }
+    await api.delete(`/products/${productIdToDelete}`);
 
     setShowDeleteConfirm(false);
     setProductIdToDelete(null);
@@ -351,7 +304,11 @@ const confirmDelete = async () => {
     }, 1200);
   } catch (err) {
     setShowDeleteConfirm(false);
-    showFeedback("danger", err.message || "Error deleting product.", `category-${deletedProductCategoryId}`);
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error deleting product.",
+      `category-${deletedProductCategoryId}`
+    );
   }
 };
 
@@ -360,17 +317,9 @@ const handleSaveRules = async () => {
   const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
 
   try {
-    const res = await fetch(`${API_URL}/${targetType}/${targetId}/rules`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({ rules: tempSelectedRules }),
+    await api.put(`/products/${targetType}/${targetId}/rules`, {
+      rules: tempSelectedRules,
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error saving rules.");
-    }
 
     if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
 
@@ -388,7 +337,7 @@ const handleSaveRules = async () => {
   } catch (err) {
     showFeedback(
       "danger",
-      err.message || "Error saving rules.",
+      err.response?.data?.error || err.message || "Error saving rules.",
       selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
     );
   }
@@ -401,17 +350,9 @@ const handleRenameCategory = async (cat) => {
   setFeedback({ type: "", message: "", location: "" });
 
   try {
-    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "user-id": userId },
-      body: JSON.stringify({ name: newName.trim() }),
+    await api.put(`/products/categories/${cat.id}`, {
+      name: newName.trim(),
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "Error renaming category.");
-    }
 
     showFeedback("success", "Category updated successfully.", `category-${cat.id}`);
 
@@ -419,7 +360,11 @@ const handleRenameCategory = async (cat) => {
       await invalidate();
     }, 800);
   } catch (err) {
-    showFeedback("danger", err.message || "Error updating category.", `category-${cat.id}`);
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error updating category.",
+      `category-${cat.id}`
+    );
   }
 };
 
@@ -429,20 +374,7 @@ const handleDeleteCategory = async (cat) => {
   setFeedback({ type: "", message: "", location: "" });
 
   try {
-    const res = await fetch(`${API_URL}/categories/${cat.id}`, {
-      method: "DELETE",
-      headers: { "user-id": userId },
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(
-        data.error ||
-          data.message ||
-          "This category cannot be deleted because it has products."
-      );
-    }
+    await api.delete(`/products/categories/${cat.id}`);
 
     showFeedback("success", "Category deleted successfully.", `category-${cat.id}`);
 
@@ -450,7 +382,11 @@ const handleDeleteCategory = async (cat) => {
       await invalidate();
     }, 1200);
   } catch (err) {
-    showFeedback("danger", err.message || "Error deleting category.", `category-${cat.id}`);
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error deleting category.",
+      `category-${cat.id}`
+    );
   }
 };
   const getComponentUnit = (name) => {
@@ -923,6 +859,17 @@ const componentHelpText =
           <div style={modalContentCustom}>
             <h2 style={modalTitleCustom}>Add New Product</h2>
 
+            {feedback.location === "add-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
+
             {modalError && (
               <Alert
                 variant="danger"
@@ -1084,33 +1031,55 @@ const componentHelpText =
                   ))}
               </select>
 
-              {!showCategoryInput ? (
-                <button
-                  style={btnLink}
-                  onClick={() => setShowCategoryInput(true)}
-                >
-                  + New Category
-                </button>
-              ) : (
-                <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
-                  <input
-                    style={{ ...inputFieldCustom, marginBottom: 0 }}
-                    placeholder="Enter Category Name..."
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                  />
-                  <button
-                    style={{
-                      ...btnMainAdd,
-                      padding: "5px 15px",
-                      marginLeft: 0,
-                    }}
-                    onClick={handleAddNewCategory}
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
+            
+             
+{!showCategoryInput ? (
+  <button
+    style={btnLink}
+    onClick={() => setShowCategoryInput(true)}
+  >
+    + New Category
+  </button>
+) : (
+  <>
+    <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
+      <input
+        style={{ ...inputFieldCustom, marginBottom: 0 }}
+        placeholder="Enter Category Name..."
+        value={newCatName}
+        onChange={(e) => setNewCatName(e.target.value)}
+      />
+
+      <button
+        style={{
+          ...btnMainAdd,
+          padding: "5px 15px",
+          marginLeft: 0,
+        }}
+        onClick={handleAddNewCategory}
+      >
+        Add
+      </button>
+    </div>
+
+    {categoryFeedback.message && (
+      <Alert
+        variant={categoryFeedback.type}
+        onClose={() => setCategoryFeedback({ type: "", message: "" })}
+        dismissible
+        style={{
+          marginTop: "10px",
+          borderRadius: "10px",
+          fontWeight: "600",
+        }}
+      >
+        {categoryFeedback.message}
+      </Alert>
+    )}
+  </>
+)}
+
+
             </div>
 
             <div style={modalFooterCustom}>
@@ -1135,6 +1104,29 @@ const componentHelpText =
         <div style={modalOverlay}>
           <div style={modalContentLarge}>
             <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+            <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+
+{feedback.location === "edit-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
+
+            {feedback.location === "edit-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
 
             {modalError && (
               <Alert
