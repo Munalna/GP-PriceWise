@@ -7,25 +7,120 @@ import {
   deletePricingRule,
 } from "../services/pricingRuleService";
 
+const RULE_TYPE_CONFIG = {
+  "profit margin": {
+    label: "Profit Margin Rule",
+    valueLabel: "Target Profit Margin (%)",
+    unit: "%",
+    inputType: "select",
+    options: [10, 15, 20, 25, 30, 35, 40, 50, 60],
+    defaultValue: 30,
+    helperText:
+      "Sets the target profit margin used when calculating the recommended price.",
+  },
+  "minimum margin": {
+    label: "Minimum Margin Protection",
+    valueLabel: "Minimum Allowed Margin (%)",
+    unit: "%",
+    inputType: "select",
+    options: [5, 10, 15, 20, 25, 30, 35, 40, 50],
+    defaultValue: 25,
+    helperText:
+      "Prevents the system from recommending a price below this profit margin.",
+  },
+  "maximum price": {
+    label: "Maximum Price Limit",
+    valueLabel: "Maximum Allowed Price (SAR)",
+    unit: "SAR",
+    inputType: "number",
+    defaultValue: "",
+    placeholder: "e.g., 25.00",
+    helperText:
+      "The recommended price will not exceed this amount.",
+  },
+  rounding: {
+    label: "Rounding Rule",
+    valueLabel: "Price Ending",
+    unit: "",
+    inputType: "select",
+    options: [0, 0.5, 0.99],
+    defaultValue: 0.99,
+    helperText:
+      "Controls how the final recommended price is rounded, such as ending with .99 or .50.",
+  },
+};
+
+function getRuleConfig(type) {
+  return RULE_TYPE_CONFIG[String(type || "").toLowerCase()] || null;
+}
+
+function getRuleLabel(type) {
+  return getRuleConfig(type)?.label || type || "-";
+}
+
 function getRuleUnit(type) {
+  return getRuleConfig(type)?.unit || "";
+}
+
+function getDefaultRuleValue(type) {
+  return getRuleConfig(type)?.defaultValue ?? "";
+}
+
+function formatRoundingOption(value) {
+  const numericValue = Number(value);
+
+  if (numericValue === 0) {
+    return "0.00 — round to whole SAR";
+  }
+
+  if (numericValue === 0.5) {
+    return "0.50 — price ends with .50";
+  }
+
+  if (numericValue === 0.99) {
+    return "0.99 — price ends with .99";
+  }
+
+  return Number(value).toFixed(2);
+}
+
+function formatOptionValue(option, type) {
   const ruleType = String(type || "").toLowerCase();
 
-  if (ruleType === "minimum margin" || ruleType === "profit margin") {
-    return "%";
+  if (ruleType === "rounding") {
+    return formatRoundingOption(option);
   }
 
-  if (ruleType === "maximum price" || ruleType === "rounding") {
-    return "SAR";
+  if (ruleType === "maximum price") {
+    return `${Number(option).toFixed(2)} SAR`;
   }
 
-  return "";
+  return `${option}%`;
 }
 
 function formatRuleValue(type, value) {
   if (value === "" || value === null || value === undefined) return "-";
 
+  const ruleType = String(type || "").toLowerCase();
+  const numericValue = Number(value);
+
+  if (ruleType === "rounding" && Number.isFinite(numericValue)) {
+    return formatRoundingOption(numericValue);
+  }
+
+  if (ruleType === "maximum price" && Number.isFinite(numericValue)) {
+    return `${numericValue.toFixed(2)} SAR`;
+  }
+
+  if (
+    (ruleType === "profit margin" || ruleType === "minimum margin") &&
+    Number.isFinite(numericValue)
+  ) {
+    return `${numericValue}%`;
+  }
+
   const unit = getRuleUnit(type);
-  return unit ? `${value} ${unit}` : value;
+  return unit ? `${value}${unit}` : value;
 }
 
 const normalize = (row) => ({
@@ -122,7 +217,7 @@ export default function PricingRules() {
         <div>
           <h2 style={styles.title}>Pricing Rules</h2>
           <p style={styles.subtitle}>
-            Manage pricing rules (name, type, value).
+            Manage pricing rules that guide recommended price calculations.
           </p>
         </div>
 
@@ -133,7 +228,9 @@ export default function PricingRules() {
 
       {error && (
         <div style={styles.errorBox}>
-          <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
+          <span>
+            <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
+          </span>
           <button style={styles.retryBtn} onClick={invalidate} type="button">
             Retry
           </button>
@@ -172,7 +269,7 @@ export default function PricingRules() {
                   sortedRules.map((rule) => (
                     <tr key={rule.id} style={styles.tr}>
                       <td style={styles.tdName}>{rule.name || "-"}</td>
-                      <td style={styles.td}>{rule.type || "-"}</td>
+                      <td style={styles.td}>{getRuleLabel(rule.type)}</td>
                       <td style={styles.td}>
                         {formatRuleValue(rule.type, rule.value)}
                       </td>
@@ -210,7 +307,7 @@ export default function PricingRules() {
 
       {showModal && (
         <PricingRuleModal
-          initial={editing || { name: "", type: "profit margin", value: "" }}
+          initial={editing || { name: "", type: "profit margin", value: 30 }}
           onClose={() => {
             setShowModal(false);
             setEditing(null);
@@ -223,21 +320,69 @@ export default function PricingRules() {
 }
 
 function PricingRuleModal({ initial, onClose, onSave }) {
+  const initialType = initial.type || "profit margin";
+
   const [name, setName] = useState(initial.name || "");
-  const [type, setType] = useState(initial.type || "profit margin");
-  const [value, setValue] = useState(initial.value ?? "");
-  const [showHelp, setShowHelp] = useState(false);
+  const [type, setType] = useState(initialType);
+  const [value, setValue] = useState(
+    initial.value !== "" && initial.value !== null && initial.value !== undefined
+      ? initial.value
+      : getDefaultRuleValue(initialType)
+  );
+
+  const config = getRuleConfig(type);
+
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    setValue(getDefaultRuleValue(newType));
+  };
 
   const submit = () => {
     if (!name.trim()) return alert("Rule name required");
     if (!type.trim()) return alert("Rule type required");
-    if (value === "" || value === null) return alert("Value required");
-    if (Number(value) < 0) return alert("Value cannot be negative");
+
+    if (value === "" || value === null || value === undefined) {
+      return alert("Value required");
+    }
+
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+      return alert("Value must be a valid number");
+    }
+
+    if (type === "profit margin" || type === "minimum margin") {
+      if (numericValue <= 0 || numericValue >= 100) {
+        return alert("Margin value must be greater than 0 and less than 100");
+      }
+    }
+
+    if (type === "maximum price") {
+      if (numericValue <= 0) {
+        return alert("Maximum price must be greater than 0");
+      }
+
+      if (numericValue > 9999) {
+        return alert("Maximum price is too high");
+      }
+
+      if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
+        return alert("Maximum price can have up to two decimal places only");
+      }
+    }
+
+    if (type === "rounding") {
+      const allowedRoundingValues = [0, 0.5, 0.99];
+
+      if (!allowedRoundingValues.includes(numericValue)) {
+        return alert("Rounding value must be 0.00, 0.50, or 0.99");
+      }
+    }
 
     onSave({
       name: name.trim(),
       type: type.trim(),
-      value: Number(value),
+      value: numericValue,
     });
   };
 
@@ -259,7 +404,7 @@ function PricingRuleModal({ initial, onClose, onSave }) {
             style={styles.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Ramadan Margin"
+            placeholder="e.g., Ramadan Profit Margin"
           />
         </div>
 
@@ -268,52 +413,50 @@ function PricingRuleModal({ initial, onClose, onSave }) {
           <select
             style={styles.input}
             value={type}
-            onChange={(e) => setType(e.target.value)}
+            onChange={(e) => handleTypeChange(e.target.value)}
           >
-            <option value="minimum margin">minimum margin</option>
-            <option value="maximum price">maximum price</option>
-            <option value="rounding">rounding</option>
-            <option value="profit margin">profit margin</option>
+            {Object.entries(RULE_TYPE_CONFIG).map(([ruleValue, ruleConfig]) => (
+              <option key={ruleValue} value={ruleValue}>
+                {ruleConfig.label}
+              </option>
+            ))}
           </select>
         </div>
 
         <div style={styles.field}>
-          <label style={styles.labelWithHelp}>
-            Value
-            <span
-              style={styles.helpIcon}
-              onMouseEnter={() => setShowHelp(true)}
-              onMouseLeave={() => setShowHelp(false)}
-            >
-              ?
-              {showHelp && (
-                <span style={styles.tooltip}>
-                  Value means the number that controls how this rule affects
-                  the recommended price.
-                  <br />
-                  • For margin rules, it is a percentage added to the cost.
-                  <br />
-                  • For maximum price, it is the highest price the system can
-                  recommend.
-                  <br />• For rounding, it is the amount used to round the final
-                  price.
-                </span>
-              )}
-            </span>
-          </label>
+          <label style={styles.label}>{config?.valueLabel || "Value"}</label>
 
-          <div style={styles.valueInputWrap}>
-            <input
-              style={{ ...styles.input, paddingRight: 58, width: "100%" }}
-              type="number"
-              value={value}
+          {config?.inputType === "select" ? (
+            <select
+              style={styles.input}
+              value={String(value)}
               onChange={(e) => setValue(e.target.value)}
-              placeholder={getRuleUnit(type) === "SAR" ? "e.g., 50" : "e.g., 30"}
-              min="0"
-              step="0.01"
-            />
-            <span style={styles.valueUnit}>{getRuleUnit(type)}</span>
-          </div>
+            >
+              {config.options.map((option) => (
+                <option key={option} value={String(option)}>
+                  {formatOptionValue(option, type)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div style={styles.valueInputWrap}>
+              <input
+                style={{ ...styles.input, paddingRight: 62, width: "100%" }}
+                type="number"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={config?.placeholder || "e.g., 25.00"}
+                min="0.01"
+                max="9999"
+                step="0.01"
+              />
+              <span style={styles.valueUnit}>{getRuleUnit(type)}</span>
+            </div>
+          )}
+
+          {config?.helperText && (
+            <small style={styles.helperText}>{config.helperText}</small>
+          )}
         </div>
 
         <div style={styles.modalFooter}>
@@ -364,6 +507,7 @@ const styles = {
     fontSize: 14,
     color: "#111827",
     borderBottom: "1px solid #eef2f7",
+    verticalAlign: "middle",
   },
   tdName: {
     padding: "14px 12px",
@@ -371,6 +515,7 @@ const styles = {
     color: "#111827",
     fontWeight: 800,
     borderBottom: "1px solid #eef2f7",
+    verticalAlign: "middle",
   },
   emptyCell: {
     padding: 18,
@@ -446,6 +591,11 @@ const styles = {
 
   field: { display: "flex", flexDirection: "column", gap: 8, marginTop: 10 },
   label: { fontSize: 13, fontWeight: 900, color: "#374151" },
+  helperText: {
+    color: "#6b7280",
+    fontSize: 12,
+    lineHeight: 1.5,
+  },
   input: {
     border: "1px solid #e5e7eb",
     borderRadius: 12,
@@ -453,6 +603,7 @@ const styles = {
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
+    background: "#fff",
   },
 
   valueInputWrap: {
@@ -467,42 +618,6 @@ const styles = {
     fontSize: 13,
     fontWeight: 900,
     pointerEvents: "none",
-  },
-  labelWithHelp: {
-    fontSize: 13,
-    fontWeight: 900,
-    color: "#374151",
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
-  helpIcon: {
-    position: "relative",
-    width: 18,
-    height: 18,
-    borderRadius: "50%",
-    background: "#eef2f7",
-    color: "#382372",
-    fontSize: 12,
-    fontWeight: 900,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "help",
-  },
-  tooltip: {
-    position: "absolute",
-    left: 24,
-    top: -8,
-    width: 280,
-    background: "#111827",
-    color: "#fff",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 12,
-    fontWeight: 600,
-    lineHeight: 1.6,
-    zIndex: 10000,
   },
 
   modalFooter: {
