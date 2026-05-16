@@ -38,8 +38,8 @@ function seasonName(s) {
 }
 
 function marginColor(pct) {
-  if (pct >= 50) return GREEN;
-  if (pct >= 20) return YELLOW;
+  if (pct >= 60) return GREEN;
+  if (pct >= 35) return YELLOW;
   return RED;
 }
 
@@ -47,8 +47,8 @@ function vsMarket(recommended, compPrice) {
   if (!compPrice || compPrice === 0)
     return { label: "N/A", color: TEXT_MUTED };
   const diff = ((recommended - compPrice) / compPrice) * 100;
-  if (diff > 10)  return { label: `+${diff.toFixed(0)}% above mkt`, color: RED   };
-  if (diff < -10) return { label: `${diff.toFixed(0)}% below mkt`,  color: GREEN };
+  if (diff > 5)  return { label: "Above Market", color: RED   };
+  if (diff < -5) return { label: "Below Market", color: GREEN };
   return { label: "Competitive", color: GREEN };
 }
 
@@ -62,7 +62,17 @@ function resolveCost(prod, imp) {
 
 // ── Main export ──────────────────────────────────────────────────
 export function buildDailyReportPdf(reportData, res) {
-  const { categories = [], fixedCosts = [], activeSeason, importedMap = {} } = reportData;
+  const { categories = [], fixedCosts = [], activeSeasons, activeSeason, importedMap = {} } = reportData;
+
+  // Support both activeSeasons (array) and legacy activeSeason (single object)
+  const seasons = Array.isArray(activeSeasons) && activeSeasons.length > 0
+    ? activeSeasons
+    : activeSeason ? [activeSeason] : [];
+  const seasonLabel = seasons.length === 0
+    ? null
+    : seasons.length === 1
+      ? seasonName(seasons[0])
+      : seasons.map(seasonName).join(", ");
 
   // No bufferPages — draw footers dynamically instead
   const doc = new PDFDocument({ margin: MARGIN, size: "A4" });
@@ -87,8 +97,8 @@ export function buildDailyReportPdf(reportData, res) {
       const imp         = importedMap[key] || {};
       const cost        = resolveCost(prod, imp);
       const compPrice   = Number(prod.avg_competitor_price ?? prod.comp_price ?? imp.competitor_price ?? 0);
-      const recommended = Number(prod.recommended_price ?? imp.recommended_price ?? 0);
-      const margin      = cost > 0 ? ((recommended - cost) / cost) * 100 : 0;
+      const recommended = Number(prod.r_price ?? prod.recommended_price ?? 0);
+      const margin      = recommended > 0 ? ((recommended - cost) / recommended) * 100 : 0;
       allProducts.push({ name: prod.name, cost, compPrice, recommended, margin });
     });
   });
@@ -161,10 +171,10 @@ export function buildDailyReportPdf(reportData, res) {
   doc.fillColor("#c4b5fd").fontSize(10)
     .text(`at ${timeStr}`, MARGIN, 418, { align: "center", width: CONTENT_W });
 
-  if (activeSeason) {
+  if (seasonLabel) {
     doc.roundedRect(MARGIN + 80, 448, CONTENT_W - 160, 30, 6).fill("#4c1d95");
     doc.fillColor("#fbbf24").fontSize(11).font("Helvetica-Bold")
-      .text(`Active Season: ${seasonName(activeSeason)}`, MARGIN + 80, 458,
+      .text(`Active Season${seasons.length > 1 ? "s" : ""}: ${seasonLabel}`, MARGIN + 80, 458,
         { align: "center", width: CONTENT_W - 160 });
   }
 
@@ -200,10 +210,10 @@ export function buildDailyReportPdf(reportData, res) {
   y += 58;
 
   // ── Season notice ────────────────────────────────────────────
-  if (activeSeason) {
+  if (seasonLabel) {
     doc.roundedRect(MARGIN, y, CONTENT_W, 22, 4).fill("#fef9c3");
     doc.fillColor("#854d0e").fontSize(8).font("Helvetica-Bold")
-      .text(`Active Season: ${seasonName(activeSeason)}  —  Prices may reflect seasonal pricing adjustments.`,
+      .text(`Active Season${seasons.length > 1 ? "s" : ""}: ${seasonLabel}  —  Prices may reflect seasonal pricing adjustments.`,
         MARGIN + 8, y + 7, { width: CONTENT_W - 16 });
     y += 30;
   }
@@ -265,8 +275,8 @@ export function buildDailyReportPdf(reportData, res) {
       const imp         = importedMap[key] || {};
       const cost        = resolveCost(prod, imp);
       const compPrice   = Number(prod.avg_competitor_price ?? prod.comp_price ?? imp.competitor_price ?? 0);
-      const recommended = Number(prod.recommended_price ?? imp.recommended_price ?? 0);
-      const margin      = cost > 0 ? ((recommended - cost) / cost) * 100 : 0;
+      const recommended = Number(prod.r_price ?? prod.recommended_price ?? 0);
+      const margin      = recommended > 0 ? ((recommended - cost) / recommended) * 100 : 0;
       const vm          = vsMarket(recommended, compPrice);
 
       catTotal.cost        += cost;

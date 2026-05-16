@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchSeasons,
@@ -8,6 +8,7 @@ import {
   fetchPricingRules,
   assignSeasonRules,
 } from "../services/seasonService";
+import ConfirmModal from "../components/cost/ConfirmModal";
 
 const normalize = (row) => ({
   id: row?.id,
@@ -18,14 +19,50 @@ const normalize = (row) => ({
   rules: row?.rules || [],
 });
 
+/* ─────────────────────────────────────────────
+   Derive status purely from dates — no DB flag
+───────────────────────────────────────────── */
+function getSeasonStatus(season) {
+  if (!season.startDate || !season.endDate) return "upcoming";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(season.startDate);
+  const end = new Date(season.endDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  if (today > end) return "passed";
+  if (today >= start && today <= end) return "active";
+  return "upcoming";
+}
+
+const STATUS_CONFIG = {
+  active:   { label: "Active",   bg: "#1f9d55" },
+  passed:   { label: "Passed",   bg: "#b45309" },
+  upcoming: { label: "Upcoming", bg: "#2563eb" },
+};
+
+const STATUS_ORDER = { active: 0, upcoming: 1, passed: 2 };
+
+/* ─────────────────────────────────────────────
+   Main Page
+───────────────────────────────────────────── */
 export default function Seasons() {
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Auto-dismiss success message after 4 seconds
+  useEffect(() => {
+    if (!successMsg) return;
+    const timer = setTimeout(() => setSuccessMsg(""), 4000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["seasons"] });
 
@@ -40,14 +77,16 @@ export default function Seasons() {
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules"],
-    queryFn: () => fetchPricingRules().then(d => Array.isArray(d) ? d : []),
+    queryFn: () => fetchPricingRules().then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 1000 * 60 * 5,
   });
 
+  // Sort: Active → Upcoming → Passed, then by start date within each group
   const sortedSeasons = useMemo(() => {
     return [...seasons].sort((a, b) => {
-      if (a.active && !b.active) return -1;
-      if (!a.active && b.active) return 1;
+      const sa = STATUS_ORDER[getSeasonStatus(a)];
+      const sb = STATUS_ORDER[getSeasonStatus(b)];
+      if (sa !== sb) return sa - sb;
       return new Date(a.startDate || 0) - new Date(b.startDate || 0);
     });
   }, [seasons]);
@@ -67,7 +106,7 @@ export default function Seasons() {
       await invalidate();
       setShowRulesModal(false);
       setSelectedSeason(null);
-      alert("Season pricing rules assigned successfully.");
+      setSuccessMsg("Pricing rules assigned successfully.");
     } catch (e) {
       alert(e.message || "Failed to assign rules");
     }
@@ -77,8 +116,10 @@ export default function Seasons() {
     try {
       if (!editing) {
         await createSeason({ name, startDate, endDate });
+        setSuccessMsg(`"${name}" was created successfully.`);
       } else {
         await updateSeason(editing.id, { name, startDate, endDate });
+        setSuccessMsg(`"${name}" was updated successfully.`);
       }
       await invalidate();
       setShowModal(false);
@@ -88,13 +129,17 @@ export default function Seasons() {
     }
   };
 
-  const onDelete = async (id) => {
-    if (!window.confirm("Delete this season?")) return;
+  const onDeleteConfirmed = async () => {
+    if (!deleteTarget) return;
+    const seasonName = deleteTarget.name;
     try {
-      await deleteSeason(id);
+      await deleteSeason(deleteTarget.id);
       await invalidate();
+      setSuccessMsg(`"${seasonName}" was deleted successfully.`);
     } catch (e) {
       alert(e.message || "Delete failed");
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -112,6 +157,15 @@ export default function Seasons() {
         </button>
       </div>
 
+      {/* Success message — auto-dismisses after 4s */}
+      {successMsg && (
+        <div style={styles.successBox}>
+          <span>✓  {successMsg}</span>
+          <button style={styles.dismissBtn} onClick={() => setSuccessMsg("")} type="button">✕</button>
+        </div>
+      )}
+
+      {/* Error message */}
       {error && (
         <div style={styles.errorBox}>
           <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
@@ -145,51 +199,61 @@ export default function Seasons() {
                     </td>
                   </tr>
                 ) : (
-                  sortedSeasons.map((s) => (
-                    <tr key={s.id} style={styles.tr}>
-                      <td style={styles.tdName}>{s.name || "-"}</td>
-                      <td style={styles.td}>{s.startDate || "-"}</td>
-                      <td style={styles.td}>{s.endDate || "-"}</td>
-                      <td style={{ ...styles.td, textAlign: "center" }}>
-                        <div style={styles.ruleBadges}>
-                          {(s.rules || []).length > 0 ? (
-                            s.rules.map((rule) => (
-                              <span key={rule.id} style={styles.ruleBadge}>{rule.name}</span>
-                            ))
-                          ) : (
-                            <span style={styles.noRules}>No rules</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "center" }}>
-                        <span style={{ ...styles.badge, background: s.active ? "#1f9d55" : "#475569" }}>
-                          {s.active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "center" }}>
-                        <div style={styles.actions}>
-                          <button
-                            style={{ ...styles.iconBtn, background: "#382372" }}
-                            onClick={() => openRulesModal(s)}
-                            type="button"
-                            title="Assign Rules"
-                          >🔗</button>
-                          <button
-                            style={styles.iconBtn}
-                            onClick={() => openEdit(s)}
-                            type="button"
-                            title="Edit Season"
-                          >✏️</button>
-                          <button
-                            style={{ ...styles.iconBtn, background: "#ef4444" }}
-                            onClick={() => onDelete(s.id)}
-                            type="button"
-                            title="Delete Season"
-                          >🗑️</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  sortedSeasons.map((s) => {
+                    const status = getSeasonStatus(s);
+                    const { label, bg } = STATUS_CONFIG[status];
+                    const isPassed = status === "passed";
+                    return (
+                      <tr key={s.id} style={styles.tr}>
+                        <td style={styles.tdName}>{s.name || "-"}</td>
+                        <td style={styles.td}>{s.startDate || "-"}</td>
+                        <td style={styles.td}>{s.endDate || "-"}</td>
+                        <td style={{ ...styles.td, textAlign: "center" }}>
+                          <div style={styles.ruleBadges}>
+                            {(s.rules || []).length > 0 ? (
+                              s.rules.map((rule) => (
+                                <span key={rule.id} style={styles.ruleBadge}>
+                                  {rule.name}
+                                </span>
+                              ))
+                            ) : (
+                              <span style={styles.noRules}>No rules</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "center" }}>
+                          <span style={{ ...styles.badge, background: bg }}>
+                            {label}
+                          </span>
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "center" }}>
+                          <div style={styles.actions}>
+                            {/* Assign rules hidden for passed seasons */}
+                            {!isPassed && (
+                              <button
+                                style={{ ...styles.iconBtn, background: "#382372" }}
+                                onClick={() => openRulesModal(s)}
+                                type="button"
+                                title="Assign Rules"
+                              >🔗</button>
+                            )}
+                            <button
+                              style={styles.iconBtn}
+                              onClick={() => openEdit(s)}
+                              type="button"
+                              title="Edit Season"
+                            >✏️</button>
+                            <button
+                              style={{ ...styles.iconBtn, background: "#ef4444" }}
+                              onClick={() => setDeleteTarget(s)}
+                              type="button"
+                              title="Delete Season"
+                            >🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -197,6 +261,7 @@ export default function Seasons() {
         )}
       </div>
 
+      {/* Create / Edit modal */}
       {showModal && (
         <SeasonModal
           initial={editing || { name: "", startDate: "", endDate: "" }}
@@ -205,6 +270,7 @@ export default function Seasons() {
         />
       )}
 
+      {/* Assign pricing rules modal */}
       {showRulesModal && selectedSeason && (
         <div style={styles.overlay}>
           <div style={styles.modal}>
@@ -229,7 +295,9 @@ export default function Seasons() {
                     <input type="checkbox" checked={tempSelectedRules.includes(rule.id)} readOnly />
                     <div>
                       <div style={{ fontWeight: 900 }}>{rule.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>{rule.type} - {rule.value}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {rule.type} - {rule.value}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -244,20 +312,44 @@ export default function Seasons() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmModal
+        show={!!deleteTarget}
+        title="Delete Season"
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={onDeleteConfirmed}
+        confirmText="Delete"
+      />
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────
+   Create / Edit Modal
+   Date rules:
+     - Start date: freely editable, no restrictions
+     - End date: must be after start date — only hard rule
+     - Warning shown in real time when resulting status would be Passed
+───────────────────────────────────────────── */
 function SeasonModal({ initial, onClose, onSave }) {
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const [name, setName] = useState(initial.name || "");
   const [startDate, setStartDate] = useState(initial.startDate || "");
   const [endDate, setEndDate] = useState(initial.endDate || "");
+  const [formError, setFormError] = useState("");
+
+  // Show a warning (not a block) when both dates are set and end is in the past
+  const willBePassed = endDate && endDate < todayStr;
 
   const submit = () => {
-    if (!name.trim()) return alert("Season name required");
-    if (!startDate) return alert("Start date required");
-    if (!endDate) return alert("End date required");
-    if (new Date(endDate) < new Date(startDate)) return alert("End date must be after start date");
+    setFormError("");
+    if (!name.trim())        return setFormError("Season name is required.");
+    if (!startDate)          return setFormError("Start date is required.");
+    if (!endDate)            return setFormError("End date is required.");
+    if (endDate <= startDate) return setFormError("End date must be after the start date.");
     onSave({ name: name.trim(), startDate, endDate });
   };
 
@@ -268,20 +360,58 @@ function SeasonModal({ initial, onClose, onSave }) {
           <h3 style={{ margin: 0 }}>{initial?.id ? "Update Season" : "Create Season"}</h3>
           <button style={styles.closeBtn} onClick={onClose} type="button">✕</button>
         </div>
+
+        {/* Season Name */}
         <div style={styles.field}>
-          <label style={styles.label}>Season Name <span style={styles.requiredStar}>*</span></label>
-          <input required style={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Ramadan Special" />
+          <label style={styles.label}>
+            Season Name <span style={styles.requiredStar}>*</span>
+          </label>
+          <input
+            style={styles.input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Ramadan Special"
+          />
         </div>
+
         <div style={styles.grid2}>
+          {/* Start Date — no restrictions */}
           <div style={styles.field}>
-            <label style={styles.label}>Start Date <span style={styles.requiredStar}>*</span></label>
-            <input required style={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <label style={styles.label}>
+              Start Date <span style={styles.requiredStar}>*</span>
+            </label>
+            <input
+              style={styles.input}
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
           </div>
+
+          {/* End Date — must be after start, no min restriction */}
           <div style={styles.field}>
-            <label style={styles.label}>End Date <span style={styles.requiredStar}>*</span></label>
-            <input required style={styles.input} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <label style={styles.label}>
+              End Date <span style={styles.requiredStar}>*</span>
+            </label>
+            <input
+              style={styles.input}
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
           </div>
         </div>
+
+        {/* Passed warning — shown in real time, not a block */}
+        {willBePassed && (
+          <div style={styles.passedWarning}>
+            ⚠️ The end date is in the past — this season will be saved as <strong>Passed</strong>.
+          </div>
+        )}
+
+        {/* Inline form error */}
+        {formError && <div style={styles.formError}>{formError}</div>}
+
         <div style={styles.modalFooter}>
           <button style={styles.secondaryBtn} onClick={onClose} type="button">Cancel</button>
           <button style={styles.primaryBtn} onClick={submit} type="button">Save</button>
@@ -291,6 +421,9 @@ function SeasonModal({ initial, onClose, onSave }) {
   );
 }
 
+/* ─────────────────────────────────────────────
+   Styles
+───────────────────────────────────────────── */
 const styles = {
   page: { padding: 22, maxWidth: 1200 },
   headerRow: {
@@ -466,11 +599,57 @@ const styles = {
   },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
 
+  passedWarning: {
+    marginTop: 10,
+    padding: "10px 14px",
+    background: "#fffbeb",
+    border: "1px solid #fcd34d",
+    color: "#92400e",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+  },
+
+  formError: {
+    marginTop: 10,
+    padding: "10px 14px",
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#9f1239",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+  },
+
   modalFooter: {
     display: "flex",
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 16,
+  },
+
+  successBox: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    color: "#15803d",
+    padding: "10px 14px",
+    borderRadius: 12,
+    marginBottom: 12,
+    fontWeight: 600,
+    fontSize: 14,
+  },
+  dismissBtn: {
+    border: "none",
+    background: "transparent",
+    color: "#15803d",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 14,
+    padding: "0 4px",
   },
 
   loadingRow: {

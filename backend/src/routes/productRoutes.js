@@ -1,4 +1,5 @@
 import express from "express";
+import protect from "../middleware/authMiddleware.js";
 
 import {
   getProducts,
@@ -14,16 +15,8 @@ import {
 
 const router = express.Router();
 
-router.use((req, res, next) => {
-  const userId = req.headers["user-id"];
-
-  if (!userId) {
-    return res.status(401).json({
-      error: "Unauthorized: No user ID provided in headers",
-    });
-  }
-
-  req.userId = userId;
+router.use(protect, (req, res, next) => {
+  req.userId = req.user.id;
   next();
 });
 

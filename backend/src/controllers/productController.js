@@ -1,5 +1,31 @@
 import * as ProductModel from '../models/productModel.js';
 
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeCategoryId(categoryId) {
+  if (categoryId === undefined) {
+    return undefined;
+  }
+
+  if (categoryId === null || categoryId === "") {
+    return null;
+  }
+
+  const normalized = String(categoryId).trim();
+  return uuidRegex.test(normalized) ? normalized : null;
+}
+
+function logControllerError(context, error, metadata = {}) {
+  console.error(`[ProductController ${context}]`, {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+    metadata,
+  });
+}
+
 export const getProducts = async (req, res) => {
   try {
     const data = await ProductModel.getAllProducts(req.userId);
@@ -60,9 +86,51 @@ export const addProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   try {
-    const updatedData = await ProductModel.updateProductById(req.params.id, req.body, req.userId);
+    const productId = req.params.id || req.body.product_id || req.body.id;
+    const categoryId = normalizeCategoryId(req.body.category_id);
+
+    if (!productId || !uuidRegex.test(String(productId))) {
+      return res.status(400).json({ error: "Invalid product id." });
+    }
+
+    if (req.body.category_id && !categoryId) {
+      return res.status(400).json({
+        error: "Invalid category_id. Send the category UUID, not the category name.",
+      });
+    }
+
+    const updatePayload = {
+      ...req.body,
+      category_id: categoryId,
+    };
+
+    console.log("[ProductController updateProduct.payload]", {
+      productId,
+      userId: req.userId,
+      categoryId,
+      hasCategoryId: Boolean(categoryId),
+      isNewBeforeUpdate: req.body.is_new,
+    });
+
+    const updatedData = await ProductModel.updateProductById(
+      productId,
+      updatePayload,
+      req.userId
+    );
     res.json(updatedData);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) {
+    logControllerError("updateProduct", error, {
+      productId: req.params.id || req.body.product_id || req.body.id,
+      userId: req.userId,
+      body: req.body,
+    });
+    res.status(error.statusCode || 500).json({
+      error: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+  }
 };
 
 export const assignPricingRules = async (req, res) => {

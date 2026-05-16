@@ -1,5 +1,28 @@
 import { supabase } from "../config/supabase.js";
 
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeUuid(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+
+  const normalized = String(value).trim();
+  return uuidRegex.test(normalized) ? normalized : null;
+}
+
+function logSupabaseError(context, error, metadata = {}) {
+  if (!error) return;
+
+  console.error(`[Supabase ${context}]`, {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+    metadata,
+  });
+}
+
 // جلب البيانات مع دمج الجداول لضمان حساب المتوسط + جلب الرولز المرتبطة
 export const getAllProducts = async (userId) => {
   const { data: categories, error } = await supabase
@@ -7,7 +30,24 @@ export const getAllProducts = async (userId) => {
     .select("*, products(*)")
     .eq("user_id", userId);
 
-  if (error) throw error;
+  if (error) {
+    logSupabaseError("getAllProducts.categories", error, { userId });
+    throw error;
+  }
+
+  const { data: uncategorizedProducts, error: uncategorizedError } =
+    await supabase
+      .from("products")
+      .select("*")
+      .eq("user_id", userId)
+      .is("category_id", null);
+
+  if (uncategorizedError) {
+    logSupabaseError("getAllProducts.uncategorizedProducts", uncategorizedError, {
+      userId,
+    });
+    throw uncategorizedError;
+  }
 
   const [res1, res2, assignmentsRes] = await Promise.all([
     supabase.from("marketdataset").select("itemname, price"),
@@ -28,13 +68,30 @@ export const getAllProducts = async (userId) => {
       .eq("user_id", userId),
   ]);
 
-  if (assignmentsRes.error) throw assignmentsRes.error;
+  if (assignmentsRes.error) {
+    logSupabaseError("getAllProducts.pricingRuleAssignments", assignmentsRes.error, {
+      userId,
+    });
+    throw assignmentsRes.error;
+  }
 
   const marketData1 = res1.data || [];
   const marketData2 = res2.data || [];
   const assignments = assignmentsRes.data || [];
 
-  const processedCategories = (categories || []).map((cat) => {
+  const sourceCategories = [...(categories || [])];
+
+  if ((uncategorizedProducts || []).length > 0) {
+    sourceCategories.unshift({
+      id: "uncategorized-drafts",
+      name: "Uncategorized Drafts",
+      user_id: userId,
+      products: uncategorizedProducts,
+      is_virtual: true,
+    });
+  }
+
+  const processedCategories = sourceCategories.map((cat) => {
     const categoryRules = assignments
       .filter(
         (assignment) =>
@@ -162,6 +219,7 @@ export const createProduct = async (p, userId) => {
         components: p.components,
         user_id: userId,
         comp_price: p.comp_price || "0.00",
+        is_new: p.is_new ?? false,
       },
     ])
     .select();
@@ -172,21 +230,98 @@ export const createProduct = async (p, userId) => {
 
 // تحديث منتج
 export const updateProductById = async (id, updates, userId) => {
+  const normalizedCategoryId = normalizeUuid(updates.category_id);
+
+  if (updates.category_id !== undefined && updates.category_id && !normalizedCategoryId) {
+    const error = new Error("Invalid category_id. Expected a valid category UUID.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (normalizedCategoryId) {
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("id", normalizedCategoryId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (categoryError) {
+      logSupabaseError("updateProductById.categoryLookup", categoryError, {
+        productId: id,
+        userId,
+        categoryId: normalizedCategoryId,
+      });
+      throw categoryError;
+    }
+
+    if (!category) {
+      const error = new Error("Category not found for this user.");
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  const productUpdates = {
+    name: updates.name,
+    components: updates.components,
+    c_price: updates.c_price,
+    comp_price: updates.comp_price,
+    r_price: updates.r_price,
+    b_cost: updates.b_cost,
+  };
+
+  if (normalizedCategoryId !== undefined) {
+    productUpdates.category_id = normalizedCategoryId;
+  }
+
+  if (updates.is_new !== undefined) {
+    productUpdates.is_new = updates.is_new;
+  }
+
+  if (
+    normalizedCategoryId &&
+    updates.b_cost !== undefined &&
+    Number(updates.b_cost) >= 0
+  ) {
+    productUpdates.is_new = false;
+  }
+
+  Object.keys(productUpdates).forEach((key) => {
+    if (productUpdates[key] === undefined) {
+      delete productUpdates[key];
+    }
+  });
+
   const { data, error } = await supabase
     .from("products")
-    .update({
-      name: updates.name,
-      components: updates.components,
-      c_price: updates.c_price,
-      comp_price: updates.comp_price,
-      r_price: updates.r_price,
-      b_cost: updates.b_cost,
-    })
+    .update(productUpdates)
     .eq("id", id)
     .eq("user_id", userId)
     .select();
 
-  if (error) throw error;
+  if (error) {
+    logSupabaseError("updateProductById.productUpdate", error, {
+      productId: id,
+      userId,
+      payload: productUpdates,
+    });
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    const error = new Error(
+      "Product update returned no rows. Check product ownership or Supabase RLS policy."
+    );
+    error.statusCode = 404;
+    console.error("[Supabase updateProductById.noRows]", {
+      productId: id,
+      userId,
+      payload: productUpdates,
+    });
+    throw error;
+  }
+
   return data[0];
 };
 

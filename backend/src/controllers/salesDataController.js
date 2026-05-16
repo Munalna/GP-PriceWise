@@ -27,70 +27,183 @@ function toSaleDate(value) {
     return date.toISOString().slice(0, 10);
 }
 
-export const importSalesData = async (req, res) => {
-    const { mappedData, userId } = req.body;
+function cleanSalesRows(mappedData) {
+    return mappedData
+        .map((row) => ({
+            product_name: normalizeProductName(row.product_name ?? row.productName),
+            quantity: toNumber(row.quantity),
+            total_price: toNumber(row.total_price ?? row.totalPrice),
+            sale_date: toSaleDate(row.sale_date ?? row.saleDate),
+        }))
+        .filter((row) => row.product_name);
+}
 
+function uniqueProductNamesFromRows(rows) {
+    return [
+        ...new Map(rows.map((row) => [productKey(row.product_name), row.product_name])).values(),
+    ];
+}
+
+function validateImportPayload(mappedData, userId) {
     if (!Array.isArray(mappedData) || mappedData.length === 0) {
-        return res.status(400).json({ error: 'mappedData must be a non-empty array' });
+        return 'mappedData must be a non-empty array';
     }
 
     if (!userId || !uuidRegex.test(userId)) {
-        return res.status(400).json({ error: 'Invalid userId. Expected a valid UUID.' });
+        return 'Invalid userId. Expected a valid UUID.';
+    }
+
+    return null;
+}
+
+async function getProductMap(client, userId) {
+    const { data: existingProducts, error: productsFetchError } = await client
+        .from('products')
+        .select('id, name')
+        .eq('user_id', userId);
+
+    if (productsFetchError) throw productsFetchError;
+
+    return new Map((existingProducts || []).map((product) => [productKey(product.name), product]));
+}
+
+async function findMissingProducts(client, userId, productNames) {
+    const productMap = await getProductMap(client, userId);
+
+    return productNames
+        .filter((name) => !productMap.has(productKey(name)))
+        .map((name) => ({ name }));
+}
+
+export const validateSalesProducts = async (req, res) => {
+    const { mappedData } = req.body;
+    const userId = req.user?.id;
+    const payloadError = validateImportPayload(mappedData, userId);
+
+    if (payloadError) {
+        return res.status(400).json({ error: payloadError });
     }
 
     try {
         const client = supabaseAdmin || supabase;
-
-        const cleanedRows = mappedData
-            .map((row) => ({
-                product_name: normalizeProductName(row.product_name ?? row.productName),
-                quantity: toNumber(row.quantity),
-                total_price: toNumber(row.total_price ?? row.totalPrice),
-                sale_date: toSaleDate(row.sale_date ?? row.saleDate),
-            }))
-            .filter((row) => row.product_name);
+        const cleanedRows = cleanSalesRows(mappedData);
 
         if (cleanedRows.length === 0) {
             return res.status(400).json({ error: 'No valid rows found. Each row needs a product name.' });
         }
 
-        const uniqueProductNames = [
-            ...new Map(cleanedRows.map((row) => [productKey(row.product_name), row.product_name])).values(),
-        ];
-
-        const { data: existingProducts, error: productsFetchError } = await client
-            .from('products')
-            .select('id, name')
-            .eq('user_id', userId);
-
-        if (productsFetchError) throw productsFetchError;
-
-        const productMap = new Map(
-            (existingProducts || []).map((product) => [productKey(product.name), product])
+        const missingProducts = await findMissingProducts(
+            client,
+            userId,
+            uniqueProductNamesFromRows(cleanedRows)
         );
 
+        return res.status(200).json({
+            hasMissingProducts: missingProducts.length > 0,
+            missingProducts,
+            missingCount: missingProducts.length,
+        });
+    } catch (error) {
+        console.error('Sales product validation error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const createDraftProducts = async (req, res) => {
+    const { productNames, products } = req.body;
+    const userId = req.user?.id;
+    const namesInput = Array.isArray(productNames) ? productNames : products;
+
+    if (!userId || !uuidRegex.test(userId)) {
+        return res.status(400).json({ error: 'Invalid userId. Expected a valid UUID.' });
+    }
+
+    if (!Array.isArray(namesInput) || namesInput.length === 0) {
+        return res.status(400).json({ error: 'productNames must be a non-empty array' });
+    }
+
+    try {
+        const client = supabaseAdmin || supabase;
+        const names = [
+            ...new Map(
+                namesInput
+                    .map((item) => normalizeProductName(item?.name ?? item))
+                    .filter(Boolean)
+                    .map((name) => [productKey(name), name])
+            ).values(),
+        ];
+
+        if (names.length === 0) {
+            return res.status(400).json({ error: 'No valid product names were provided.' });
+        }
+
+        const missingProducts = await findMissingProducts(client, userId, names);
+
+        if (missingProducts.length === 0) {
+            return res.status(200).json({
+                message: 'All products already exist.',
+                draftedProducts: [],
+                draftedCount: 0,
+            });
+        }
+
+        const draftRows = missingProducts.map((product) => ({
+            user_id: userId,
+            category_id: null,
+            name: product.name,
+            components: JSON.stringify([]),
+            b_cost: 0,
+            c_price: 0,
+            comp_price: 0,
+            is_new: true,
+        }));
+
+        const { data: draftedProducts, error: productInsertError } = await client
+            .from('products')
+            .insert(draftRows)
+            .select('id, name, is_new');
+
+        if (productInsertError) throw productInsertError;
+
+        return res.status(201).json({
+            message: 'Draft products created.',
+            draftedProducts: draftedProducts || [],
+            draftedCount: draftedProducts?.length || 0,
+        });
+    } catch (error) {
+        console.error('Draft product insert error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const importSalesData = async (req, res) => {
+    const { mappedData } = req.body;
+    const userId = req.user?.id;
+    const payloadError = validateImportPayload(mappedData, userId);
+
+    if (payloadError) {
+        return res.status(400).json({ error: payloadError });
+    }
+
+    try {
+        const client = supabaseAdmin || supabase;
+        const cleanedRows = cleanSalesRows(mappedData);
+
+        if (cleanedRows.length === 0) {
+            return res.status(400).json({ error: 'No valid rows found. Each row needs a product name.' });
+        }
+
+        const uniqueProductNames = uniqueProductNamesFromRows(cleanedRows);
+        const productMap = await getProductMap(client, userId);
         const missingProducts = uniqueProductNames
             .filter((name) => !productMap.has(productKey(name)))
-            .map((name) => ({
-                user_id: userId,
-                name,
-                b_cost: 0,
-                is_new: true,
-            }));
-
-        let insertedProducts = [];
+            .map((name) => ({ name }));
 
         if (missingProducts.length > 0) {
-            const { data: newProducts, error: productInsertError } = await client
-                .from('products')
-                .insert(missingProducts)
-                .select('id, name');
-
-            if (productInsertError) throw productInsertError;
-
-            insertedProducts = newProducts || [];
-            insertedProducts.forEach((product) => {
-                productMap.set(productKey(product.name), product);
+            return res.status(409).json({
+                error: 'Unregistered products detected in the file.',
+                missingProducts,
+                missingCount: missingProducts.length,
             });
         }
 
@@ -106,6 +219,13 @@ export const importSalesData = async (req, res) => {
             };
         });
 
+        const { error: salesDeleteError } = await client
+            .from('sales_data')
+            .delete()
+            .eq('user_id', userId);
+
+        if (salesDeleteError) throw salesDeleteError;
+
         const { data: insertedSalesRows, error: salesInsertError } = await client
             .from('sales_data')
             .insert(salesRows)
@@ -116,12 +236,9 @@ export const importSalesData = async (req, res) => {
         return res.status(200).json({
             message: 'Sales data imported successfully.',
             importedCount: insertedSalesRows?.length || salesRows.length,
-            newProductsAdded: insertedProducts.length > 0,
-            newProductsCount: insertedProducts.length,
-            newProducts: insertedProducts.map((product) => ({
-                id: product.id,
-                name: product.name,
-            })),
+            newProductsAdded: false,
+            newProductsCount: 0,
+            newProducts: [],
         });
     } catch (error) {
         console.error('Sales import error:', error);
@@ -130,10 +247,10 @@ export const importSalesData = async (req, res) => {
 };
 
 export const getSalesAnalytics = async (req, res) => {
-    const { userId } = req.query;
+    const userId = req.user?.id;
 
     if (!userId) {
-        return res.status(400).json({ error: 'userId query parameter is required' });
+        return res.status(401).json({ error: 'Authenticated user is required' });
     }
 
     try {
