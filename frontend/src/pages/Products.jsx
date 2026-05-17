@@ -3,71 +3,15 @@ import { Spinner, Alert } from "react-bootstrap";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import {
-  getAIPriceRecommendation,
-  checkMarketProduct,
-} from "../services/analyticsService";
+import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
 
-function normalizeRuleType(type) {
-  return String(type || "").trim().toLowerCase();
-}
-
-function getRuleDisplayName(type) {
-  const ruleType = normalizeRuleType(type);
-
-  if (ruleType === "profit margin") return "Profit Margin Rule";
-  if (ruleType === "minimum margin") return "Minimum Margin Protection";
-  if (ruleType === "maximum price") return "Maximum Price Limit";
-  if (ruleType === "rounding") return "Rounding Rule";
-
-  return type || "Pricing Rule";
-}
-
-function getRuleDisplayValue(rule) {
-  if (
-    !rule ||
-    rule.value === "" ||
-    rule.value === null ||
-    rule.value === undefined
-  ) {
-    return "-";
-  }
-
-  const ruleType = normalizeRuleType(rule.type);
-  const value = Number(rule.value);
-
-  if (ruleType === "rounding" && Number.isFinite(value)) {
-    if (value === 0) return "0.00 — round to whole SAR";
-    if (value === 0.5) return "0.50 — price ends with .50";
-    if (value === 0.99) return "0.99 — price ends with .99";
-    return value.toFixed(2);
-  }
-
-  if (ruleType === "maximum price" && Number.isFinite(value)) {
-    return `${value.toFixed(2)} SAR`;
-  }
-
-  if (
-    (ruleType === "profit margin" || ruleType === "minimum margin") &&
-    Number.isFinite(value)
-  ) {
-    return `${value}%`;
-  }
-
-  return String(rule.value);
-}
-
-function getUniqueIds(ids = []) {
-  return [...new Set(ids.filter(Boolean))];
-}
-
+const API_URL = "/api/products";
 function Products() {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["products"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
   const { data: categories = [], isLoading: loadingCats } = useQuery({
     queryKey: ["products", userId],
@@ -85,7 +29,7 @@ function Products() {
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules", userId],
-    queryFn: () => api.get("/pricing-rules").then((r) => r.data),
+    queryFn: () => api.get("/pricing-rules").then(r => r.data),
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
   });
@@ -107,48 +51,60 @@ function Products() {
   const [productIdToDelete, setProductIdToDelete] = useState(null);
   const [marketCheck, setMarketCheck] = useState(null);
   const [componentSearch, setComponentSearch] = useState("");
-  const [newProd, setNewProd] = useState({
-    name: "",
-    components: [],
-    category_id: "",
-  });
+  const [newProd, setNewProd] = useState({ name: "", components: [], category_id: "" });
   const [newCatName, setNewCatName] = useState("");
   const [editCatName, setEditCatName] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
-  const [initialAssignedRuleIds, setInitialAssignedRuleIds] = useState([]);
+  const [feedback, setFeedback] = useState({
+  type: "",
+  message: "",
+  location: "",
+});
+const FEEDBACK_DURATION = 5000;
+
+const showFeedback = (type, message, location) => {
+  setFeedback({ type, message, location });
+
+  setTimeout(() => {
+    setFeedback({ type: "", message: "", location: "" });
+  }, FEEDBACK_DURATION);
+};
+
+const [categoryFeedback, setCategoryFeedback] = useState({
+  type: "",
+  message: "",
+});
+
+const showCategoryFeedback = (type, message) => {
+  setCategoryFeedback({ type, message });
+
+  setTimeout(() => {
+    setCategoryFeedback({ type: "", message: "" });
+  }, FEEDBACK_DURATION);
+};
+
+
 
   const calculateAvg = (prices) => {
-    if (!prices || !Array.isArray(prices) || prices.length === 0) {
-      return "0.00";
-    }
-
+    if (!prices || !Array.isArray(prices) || prices.length === 0) return "0.00";
     const validPrices = prices.map((p) => Number(p)).filter((p) => !isNaN(p));
-
     if (validPrices.length === 0) return "0.00";
-
     const sum = validPrices.reduce((acc, val) => acc + val, 0);
     return (sum / validPrices.length).toFixed(2);
   };
 
   const handleCheckMarketProduct = async (name) => {
-    if (!name || name.trim().length < 2) {
-      setMarketCheck(null);
-      return;
-    }
-
+    if (!name || name.trim().length < 2) { setMarketCheck(null); return; }
     try {
       const result = await checkMarketProduct(name);
       setMarketCheck(result);
-    } catch (err) {
-      console.error("Market check error:", err);
-    }
+    } catch (err) { console.error("Market check error:", err); }
   };
 
   const calculateTotalVcost = (prodComponents) => {
     if (!prodComponents || !Array.isArray(prodComponents)) return 0;
-
     return prodComponents.reduce((sum, item) => {
       const dbInfo = varComponents.find((c) => c.name === item.name);
       const unitCost = dbInfo ? Number(dbInfo.cost_per_unit) : 0;
@@ -163,316 +119,288 @@ function Products() {
   const parseComponents = (compData) => {
     if (!compData) return [];
     if (Array.isArray(compData)) return compData;
-
-    try {
-      return JSON.parse(compData);
-    } catch (e) {
-      return [];
-    }
+    try { return JSON.parse(compData); } catch (e) { return []; }
   };
 
   const handleAnalyzePricing = async (productId) => {
     setRiskLoading(true);
     setError("");
-
     try {
       const result = await getAIPriceRecommendation(productId);
       setRiskResult(result.data);
       setShowRiskModal(true);
-
       if (result.data?.ai?.recommended_price) {
-        setAiRecommendedPrices((prev) => ({
-          ...prev,
-          [productId]: result.data.ai.recommended_price,
-        }));
+        setAiRecommendedPrices((prev) => ({ ...prev, [productId]: result.data.ai.recommended_price }));
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.message ||
-          "Failed to analyze product pricing."
-      );
-    } finally {
-      setRiskLoading(false);
-    }
-  };
-
-  const openRulesForCategory = (cat) => {
-    const assignedRuleIds = getUniqueIds((cat.rules || []).map((rule) => rule.id));
-
-    setSelectedCategory(cat);
-    setSelectedProduct(null);
-    setTempSelectedRules(assignedRuleIds);
-    setInitialAssignedRuleIds(assignedRuleIds);
-    setShowRulesModal(true);
-  };
-
-  const openRulesForProduct = (prod, comps) => {
-    const assignedRuleIds = getUniqueIds((prod.rules || []).map((rule) => rule.id));
-
-    setSelectedProduct({
-      ...prod,
-      components: comps,
-    });
-    setSelectedCategory(null);
-    setTempSelectedRules(assignedRuleIds);
-    setInitialAssignedRuleIds(assignedRuleIds);
-    setShowRulesModal(true);
-  };
-
-  const closeRulesModal = () => {
-    setShowRulesModal(false);
-    setSelectedProduct(null);
-    setSelectedCategory(null);
-    setTempSelectedRules([]);
-    setInitialAssignedRuleIds([]);
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to analyze product pricing.");
+    } finally { setRiskLoading(false); }
   };
 
   const toggleComponent = (name, isEdit = false) => {
     const target = isEdit ? selectedProduct : newProd;
     let updatedComps = [...(target.components || [])];
     const index = updatedComps.findIndex((c) => c.name === name);
-
-    if (index > -1) {
-      updatedComps = updatedComps.filter((c) => c.name !== name);
-    } else {
-      updatedComps.push({ name, qty: 1 });
-    }
-
-    if (isEdit) {
-      setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    } else {
-      setNewProd({ ...newProd, components: updatedComps });
-    }
+    if (index > -1) updatedComps = updatedComps.filter((c) => c.name !== name);
+    else updatedComps.push({ name, qty: 1 });
+    if (isEdit) setSelectedProduct({ ...selectedProduct, components: updatedComps });
+    else setNewProd({ ...newProd, components: updatedComps });
   };
 
   const updateQty = (name, val, isEdit = false) => {
-    const target = isEdit ? selectedProduct : newProd;
+  const target = isEdit ? selectedProduct : newProd;
 
-    let newValue = val;
+  let newValue = val;
 
-    if (val !== "") {
-      newValue = Math.max(0, Number(val));
-    }
+  if (val !== "") {
+    newValue = Math.max(0, Number(val));
+  }
 
-    const updatedComps = target.components.map((c) =>
-      c.name === name ? { ...c, qty: newValue } : c
+  const updatedComps = target.components.map((c) =>
+    c.name === name ? { ...c, qty: newValue } : c
+  );
+
+  if (isEdit) {
+    setSelectedProduct({ ...selectedProduct, components: updatedComps });
+  } else {
+    setNewProd({ ...newProd, components: updatedComps });
+  }
+};
+
+const handleAddNewCategory = async () => {
+  setCategoryFeedback({ type: "", message: "" });
+
+  if (!newCatName.trim()) {
+    showCategoryFeedback("danger", "Category name is required.");
+    return;
+  }
+
+  try {
+    const res = await api.post("/products/categories", {
+      name: newCatName.trim(),
+    });
+
+    await invalidate();
+
+    setNewProd((prev) => ({
+      ...prev,
+      category_id: res.data?.id || prev.category_id,
+    }));
+
+    setNewCatName("");
+    showCategoryFeedback("success", "Category added successfully.");
+  } catch (err) {
+    showCategoryFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error adding category."
+    );
+  }
+};
+
+const handleSaveProduct = async () => {
+  setFeedback({ type: "", message: "", location: "" });
+
+  if (!newProd.name.trim()) return showFeedback("danger", "Product name is required.", "add-product-modal");
+  if (!newProd.category_id) return showFeedback("danger", "Category is required.", "add-product-modal");
+  if (!newProd.components?.length) return showFeedback("danger", "At least one component is required.", "add-product-modal");
+
+  if (newProd.components.some((c) => Number(c.qty) <= 0)) {
+    return showFeedback("danger", "Each selected component must have a quantity greater than 0.", "add-product-modal");
+  }
+
+  const addedProductCategoryId = newProd.category_id;
+
+  try {
+    await api.post("/products", {
+      ...newProd,
+      components: JSON.stringify(newProd.components),
+      v_cost: calculateTotalVcost(newProd.components).toString(),
+      b_cost: "0.00",
+      c_price: "0.00",
+      comp_price: "0.00",
+    });
+
+    setShowAddModal(false);
+    setNewProd({ name: "", components: [], category_id: "" });
+    setMarketCheck(null);
+
+    showFeedback("success", "Product added successfully.", `category-${addedProductCategoryId}`);
+
+    setTimeout(async () => {
+      await invalidate();
+    }, 800);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error saving product.",
+      "add-product-modal"
+    );
+  }
+};
+
+const handleUpdateProduct = async () => {
+  setFeedback({ type: "", message: "", location: "" });
+
+  if (!selectedProduct.name?.trim()) return showFeedback("danger", "Product name is required.", "edit-product-modal");
+  if (selectedProduct.c_price === "" || selectedProduct.c_price == null) return showFeedback("danger", "Current price is required.", "edit-product-modal");
+  if (Number(selectedProduct.c_price) < 0) return showFeedback("danger", "Current price cannot be negative.", "edit-product-modal");
+
+  if (selectedProduct.components?.some((c) => Number(c.qty) <= 0)) {
+    return showFeedback("danger", "Each selected component must have a quantity greater than 0.", "edit-product-modal");
+  }
+
+  const updatedProductCategoryId = selectedProduct.category_id;
+
+  try {
+    await api.put(`/products/${selectedProduct.id}`, {
+      ...selectedProduct,
+      components: JSON.stringify(selectedProduct.components),
+      v_cost: calculateTotalVcost(selectedProduct.components).toString(),
+      c_price: selectedProduct.c_price,
+      comp_price: selectedProduct.comp_price,
+      b_cost: selectedProduct.b_cost,
+    });
+
+    setShowEditModal(false);
+
+    showFeedback("success", "Product updated successfully.", `category-${updatedProductCategoryId}`);
+
+    setTimeout(async () => {
+      await invalidate();
+    }, 800);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error updating product.",
+      "edit-product-modal"
+    );
+  }
+};
+
+const confirmDelete = async () => {
+  if (!productIdToDelete) return;
+
+  setFeedback({ type: "", message: "", location: "" });
+
+  const deletedProductCategoryId = categories
+    .flatMap((cat) =>
+      (cat.products || []).map((prod) => ({
+        productId: prod.id,
+        categoryId: cat.id,
+      }))
+    )
+    .find((item) => item.productId === productIdToDelete)?.categoryId;
+
+  try {
+    await api.delete(`/products/${productIdToDelete}`);
+
+    setShowDeleteConfirm(false);
+    setProductIdToDelete(null);
+
+    showFeedback("success", "Product deleted successfully.", `category-${deletedProductCategoryId}`);
+
+    setTimeout(async () => {
+      await invalidate();
+    }, 1200);
+  } catch (err) {
+    setShowDeleteConfirm(false);
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error deleting product.",
+      `category-${deletedProductCategoryId}`
+    );
+  }
+};
+
+const handleSaveRules = async () => {
+  const targetType = selectedProduct ? "products" : "categories";
+  const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
+
+  try {
+    await api.put(`/products/${targetType}/${targetId}/rules`, {
+      rules: tempSelectedRules,
+    });
+
+    if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+
+    setShowRulesModal(false);
+
+    showFeedback(
+      "success",
+      "Pricing rules assigned successfully.",
+      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
     );
 
-    if (isEdit) {
-      setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    } else {
-      setNewProd({ ...newProd, components: updatedComps });
-    }
-  };
-
-  const handleAddNewCategory = async (target = "add") => {
-    const categoryName = target === "edit" ? editCatName : newCatName;
-
-    if (!categoryName?.trim()) {
-      return setModalError("Category name is required.");
-    }
-
-    try {
-      setModalError("");
-
-      const { data: category } = await api.post("/products/categories", {
-        name: categoryName.trim(),
-      });
-
+    setTimeout(async () => {
       await invalidate();
+    }, 800);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error saving rules.",
+      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
+    );
+  }
+};
 
-      if (target === "edit") {
-        setSelectedProduct((current) => ({
-          ...current,
-          category_id: category.id,
-        }));
-        setEditCatName("");
-        setShowEditCategoryInput(false);
-      } else {
-        setNewProd((current) => ({
-          ...current,
-          category_id: category.id,
-        }));
-        setNewCatName("");
-        setShowCategoryInput(false);
-      }
-    } catch (err) {
-      setModalError(err.response?.data?.error || "Error adding category");
-    }
-  };
+const handleRenameCategory = async (cat) => {
+  const newName = prompt("Enter new category name:", cat.name);
+  if (!newName?.trim()) return;
 
-  const handleSaveProduct = async () => {
-    if (!newProd.name.trim()) return setModalError("Product name is required.");
-    if (!newProd.category_id) return setModalError("Category is required.");
-    if (!newProd.components?.length) {
-      return setModalError("At least one component is required.");
-    }
+  setFeedback({ type: "", message: "", location: "" });
 
-    try {
-      setModalError("");
+  try {
+    await api.put(`/products/categories/${cat.id}`, {
+      name: newName.trim(),
+    });
 
-      await api.post("/products", {
-        ...newProd,
-        components: JSON.stringify(newProd.components),
-        v_cost: calculateTotalVcost(newProd.components).toString(),
-        b_cost: "0.00",
-        c_price: "0.00",
-        comp_price: "0.00",
-      });
+    showFeedback("success", "Category updated successfully.", `category-${cat.id}`);
 
+    setTimeout(async () => {
       await invalidate();
-      setShowAddModal(false);
-      setModalError("");
-      setNewProd({ name: "", components: [], category_id: "" });
-    } catch (err) {
-      setModalError(err.response?.data?.error || "Error saving product");
-    }
-  };
+    }, 800);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error updating category.",
+      `category-${cat.id}`
+    );
+  }
+};
 
-  const handleUpdateProduct = async () => {
-    if (!selectedProduct.name?.trim()) {
-      return setModalError("Product name is required.");
-    }
+const handleDeleteCategory = async (cat) => {
+  if (!window.confirm(`Delete category "${cat.name}"?`)) return;
 
-    if (!selectedProduct.category_id) {
-      return setModalError("Category is required.");
-    }
+  setFeedback({ type: "", message: "", location: "" });
 
-    if (!selectedProduct.components?.length) {
-      return setModalError("At least one component is required.");
-    }
+  try {
+    await api.delete(`/products/categories/${cat.id}`);
 
-    if (selectedProduct.c_price === "" || selectedProduct.c_price == null) {
-      return setModalError("Current price is required.");
-    }
+    showFeedback("success", "Category deleted successfully.", `category-${cat.id}`);
 
-    if (Number(selectedProduct.c_price) < 0) {
-      return setModalError("Current price cannot be negative.");
-    }
-
-    const draftIsComplete =
-      Boolean(selectedProduct.name?.trim()) &&
-      Boolean(selectedProduct.category_id) &&
-      Array.isArray(selectedProduct.components) &&
-      selectedProduct.components.length > 0 &&
-      selectedProduct.c_price !== "" &&
-      selectedProduct.c_price != null &&
-      Number(selectedProduct.c_price) >= 0;
-
-    try {
-      setModalError("");
-
-      await api.put(`/products/${selectedProduct.id}`, {
-        ...selectedProduct,
-        product_id: selectedProduct.id,
-        category_id: selectedProduct.category_id,
-        components: JSON.stringify(selectedProduct.components),
-        v_cost: calculateTotalVcost(selectedProduct.components).toString(),
-        c_price: selectedProduct.c_price,
-        comp_price: selectedProduct.comp_price,
-        b_cost: selectedProduct.b_cost,
-        is_new: selectedProduct.is_new
-          ? !draftIsComplete
-          : selectedProduct.is_new,
-      });
-
+    setTimeout(async () => {
       await invalidate();
-
-      setShowEditModal(false);
-      setModalError("");
-      setEditCatName("");
-      setShowEditCategoryInput(false);
-    } catch (err) {
-      console.error("Error updating product:", err);
-      setModalError(
-        err.response?.data?.error || err.message || "Error updating product"
-      );
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!productIdToDelete) return;
-
-    try {
-      await api.delete(`/products/${productIdToDelete}`);
-      await invalidate();
-      setShowDeleteConfirm(false);
-      setProductIdToDelete(null);
-    } catch (err) {
-      setError(err.response?.data?.error || "Error deleting product");
-    }
-  };
-
-  const handleSaveRules = async () => {
-    const targetType = selectedProduct ? "products" : "categories";
-    const targetId = selectedProduct ? selectedProduct.id : selectedCategory?.id;
-    const uniqueRuleIds = getUniqueIds(tempSelectedRules);
-
-    if (!targetId) return;
-
-    try {
-      await api.put(`/products/${targetType}/${targetId}/rules`, {
-        rules: uniqueRuleIds,
-      });
-
-      if (selectedProduct) {
-        await handleAnalyzePricing(selectedProduct.id);
-      }
-
-      await invalidate();
-      closeRulesModal();
-      alert("Pricing rules assigned successfully.");
-    } catch (err) {
-      setError(err.response?.data?.error || "Error saving rules");
-    }
-  };
-
-  const handleRenameCategory = async (cat) => {
-    const newName = prompt("Enter new category name:", cat.name);
-
-    if (!newName?.trim()) return;
-
-    try {
-      await api.put(`/products/categories/${cat.id}`, { name: newName.trim() });
-      await invalidate();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleDeleteCategory = async (cat) => {
-    if (!window.confirm(`Delete category "${cat.name}"?`)) return;
-
-    try {
-      await api.delete(`/products/categories/${cat.id}`);
-      await invalidate();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    }
-  };
-
+    }, 1200);
+  } catch (err) {
+    showFeedback(
+      "danger",
+      err.response?.data?.error || err.message || "Error deleting category.",
+      `category-${cat.id}`
+    );
+  }
+};
   const getComponentUnit = (name) => {
-    const comp = varComponents.find((c) => c.name === name);
-    return comp?.unit || "";
-  };
+  const comp = varComponents.find((c) => c.name === name);
+  return comp?.unit || "";
+};
 
-  const getComponentCostPerUnit = (name) => {
-    const comp = varComponents.find((c) => c.name === name);
-    return Number(comp?.cost_per_unit || 0);
-  };
+const getComponentCostPerUnit = (name) => {
+  const comp = varComponents.find((c) => c.name === name);
+  return Number(comp?.cost_per_unit || 0);
+};
 
-  const assignmentTargetLabel = selectedProduct
-    ? `Product: ${selectedProduct.name}`
-    : selectedCategory
-    ? `Category: ${selectedCategory.name}`
-    : "";
-
-    const appliedPricingRules =
-  riskResult?.rules?.applied_rules ||
-  riskResult?.ai?.applied_rules ||
-  [];
+const componentHelpText =
+  "Select the ingredients used in ONE product recipe, then enter the amount used. Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.";
 
   return (
     <div style={pageContainer}>
@@ -489,7 +417,7 @@ function Products() {
         </button>
       </div>
 
-      {error && !showAddModal && !showEditModal && (
+      {error && (
         <Alert variant="danger" onClose={() => setError("")} dismissible>
           {error}
         </Alert>
@@ -512,59 +440,85 @@ function Products() {
           ) : categories.length === 0 ? (
             <div style={emptySimpleStyle}>There is no product yet</div>
           ) : (
-            categories.map((cat) => (
-              <div key={cat.id} style={categoryCard}>
-                <div style={categoryHeader}>
-                  <div>
-                    <div style={categoryTitleRow}>
-                      <h2 style={catTitleText}>{cat.name}</h2>
+            categories.map((cat) => ( 
+            <div key={cat.id} style={categoryCard}> 
 
-                      <button
-                        style={categoryEditBtn}
-                        disabled={cat.is_virtual}
-                        onClick={() => {
-                          if (!cat.is_virtual) handleRenameCategory(cat);
-                        }}
-                        title="Rename Category"
-                      >
-                        ✏️
-                      </button>
+  <div style={categoryHeader}>
+    <div>
+      <div style={categoryTitleRow}>
+        <h2 style={catTitleText}>{cat.name}</h2>
 
-                      <button
-                        style={categoryDeleteBtn}
-                        disabled={cat.is_virtual}
-                        onClick={() => {
-                          if (!cat.is_virtual) handleDeleteCategory(cat);
-                        }}
-                        title="Delete Category"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+        <button
+          style={categoryEditBtn}
+          disabled={cat.is_virtual}
+          onClick={() => {
+            if (!cat.is_virtual) handleRenameCategory(cat);
+          }}
+          title="Rename Category"
+        >
+          ✏️
+        </button>
 
-                    <div style={badgeRow}>
-                      {(cat.rules || []).map((rule, idx) => (
-                        <span key={rule.id || idx} style={orangeBadgeSmall}>
-                          {rule.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+        <button
+          style={categoryDeleteBtn}
+          disabled={cat.is_virtual}
+          onClick={() => {
+            if (!cat.is_virtual) handleDeleteCategory(cat);
+          }}
+          title="Delete Category"
+        >
+          🗑️
+        </button>
+      </div>
+
+      <div style={badgeRow}>
+        {(cat.rules || []).map((rule, idx) => (
+          <span key={idx} style={orangeBadgeSmall}>
+            {rule.name}
+          </span>
+        ))}
+      </div>
+    </div>
 
                   <button
                     style={btnAssignRules}
                     disabled={cat.is_virtual}
                     onClick={() => {
                       if (cat.is_virtual) return;
-                      openRulesForCategory(cat);
+                      setSelectedCategory(cat);
+                      setSelectedProduct(null);
+                      setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
+                      setShowRulesModal(true);
                     }}
                   >
                     🔗 Assign Rules
                   </button>
                 </div>
 
-                {cat.products && cat.products.length > 0 ? (
-                  <table style={tableStyle}>
+ {feedback.location === `category-${cat.id}` && (
+
+    <Alert
+
+      variant={feedback.type}
+
+      onClose={() => setFeedback({ type: "", message: "", location: "" })}
+
+      dismissible
+
+      style={inlineAlertStyle}
+
+    >
+
+      {feedback.message}
+
+    </Alert>
+
+  )}
+  {cat.products && cat.products.length > 0 ? (
+
+                  <div style={tableScrollWrap}>
+
+  <table style={tableStyle}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Product Name</th>
@@ -587,7 +541,6 @@ function Products() {
                             <td style={tdStyle}>
                               <div style={productNameRow}>
                                 <span style={prodNameText}>{prod.name}</span>
-
                                 {prod.is_new && (
                                   <span
                                     style={draftWarningBadge}
@@ -598,12 +551,11 @@ function Products() {
                                   </span>
                                 )}
                               </div>
-
-                              {(prod.rules || []).map((rule, i) => (
-                                <div key={rule.id || i} style={blueBadgeSmall}>
-                                  {rule.name}
-                                </div>
-                              ))}
+                              {(prod.rules || []).map((r, i) => (
+  <div key={r.id || i} style={blueBadgeSmall}>
+    {r.name}
+  </div>
+))}
                             </td>
 
                             <td style={tdStyle}>
@@ -617,13 +569,11 @@ function Products() {
                                 {comps.length > 0
                                   ? comps.map((c, i) => (
                                       <div key={i} style={recipeRowMini}>
-                                        <span style={recipeNameMini}>
-                                          {c.name}
-                                        </span>
-                                        <span style={recipeQtyMini}>
-                                          {c.qty} {getComponentUnit(c.name)}
-                                        </span>
-                                      </div>
+  <span style={recipeNameMini}>{c.name}</span>
+  <span style={recipeQtyMini}>
+    {c.qty} {getComponentUnit(c.name)}
+  </span>
+</div>
                                     ))
                                   : "—"}
                               </div>
@@ -632,10 +582,8 @@ function Products() {
                             <td style={tdStyle}>
                               {calculateTotalVcost(comps)} SAR
                             </td>
-
                             <td style={tdStyle}>{prod.b_cost} SAR</td>
                             <td style={tdStyle}>{prod.c_price} SAR</td>
-
                             <td
                               style={{
                                 ...tdStyle,
@@ -644,12 +592,12 @@ function Products() {
                               }}
                             >
                               {aiRecommendedPrices[prod.id]
-                                ? `${aiRecommendedPrices[prod.id]} SAR`
-                                : prod.r_price
-                                ? `${prod.r_price} SAR`
-                                : "Analyze"}
+  ? `${aiRecommendedPrices[prod.id]} SAR`
+  : prod.r_price
+  ? `${prod.r_price} SAR`
+  : "Analyze"}
                             </td>
-
+                            
                             <td
                               style={{
                                 ...tdStyle,
@@ -657,7 +605,20 @@ function Products() {
                                 fontWeight: "600",
                               }}
                             >
-                              {calculateAvg(prod.competitors_prices)} SAR
+                             {Number(calculateAvg(prod.competitors_prices)) === 0 ? (
+  <span className="help-icon" style={competitorZeroHint}>
+    0.00 SAR
+    <span className="tooltip" style={competitorTooltipBox}>
+      No matching product was found in the market dataset.
+      <br />
+      The competitor average is shown as 0 SAR.
+    </span>
+  </span>
+) : (
+  <span>
+    {calculateAvg(prod.competitors_prices)} SAR
+  </span>
+)}
                             </td>
 
                             <td style={tdStyle}>
@@ -673,15 +634,21 @@ function Products() {
 
                                 <button
                                   style={actionBtnBlue}
-                                  title="Assign Rules"
-                                  onClick={() => openRulesForProduct(prod, comps)}
+                                  onClick={() => {
+                                    setSelectedProduct({
+                                      ...prod,
+                                      components: comps,
+                                    });
+                                    setSelectedCategory(null);
+                                    setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
+                                    setShowRulesModal(true);
+                                  }}
                                 >
                                   🔗
                                 </button>
 
                                 <button
                                   style={actionBtnOrange}
-                                  title="Edit Product"
                                   onClick={() => {
                                     setSelectedProduct({
                                       ...prod,
@@ -698,7 +665,6 @@ function Products() {
 
                                 <button
                                   style={actionBtnRed}
-                                  title="Delete Product"
                                   onClick={() => {
                                     setProductIdToDelete(prod.id);
                                     setShowDeleteConfirm(true);
@@ -713,6 +679,7 @@ function Products() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 ) : (
                   <div style={emptyPlaceholderText}>
                     No products in this category.
@@ -737,30 +704,12 @@ function Products() {
             </div>
 
             {riskResult.ai && (
-              <div style={recommendedBox}>
-                <strong>AI Recommended Price</strong>
-                <h2>{riskResult.ai.recommended_price} SAR</h2>
-                <p>{riskResult.ai.reason}</p>
-              </div>
-            )}
-
-            <div style={appliedRulesBox}>
-  <strong>Applied Pricing Rules</strong>
-
-  {appliedPricingRules.length > 0 ? (
-    <ul style={appliedRuleList}>
-      {appliedPricingRules.map((ruleMessage, index) => (
-        <li key={index} style={appliedRuleItem}>
-          {ruleMessage}
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <p style={{ margin: "8px 0 0", color: "#666" }}>
-      No pricing rule changed the final recommended price for this analysis.
-    </p>
-  )}
-</div>
+  <div style={recommendedBox}>
+    <strong>AI Recommended Price</strong>
+    <h2>{riskResult.ai.recommended_price} SAR</h2>
+    <p>{riskResult.ai.reason}</p>
+  </div>
+)}
 
             <div style={riskGrid}>
               <div style={riskCard}>
@@ -816,28 +765,28 @@ function Products() {
             </div>
 
             {riskResult.ai ? (
-              <>
-                <div style={insightBox}>
-                  <strong>AI Risk Explanation</strong>
-                  <p>{riskResult.ai.risk_explanation}</p>
-                </div>
+  <>
+    <div style={insightBox}>
+      <strong>AI Risk Explanation</strong>
+      <p>{riskResult.ai.risk_explanation}</p>
+    </div>
 
-                <div style={insightBox}>
-                  <strong>AI Margin Safety</strong>
-                  <p>{riskResult.ai.margin_safety_explanation}</p>
-                </div>
+    <div style={insightBox}>
+      <strong>AI Margin Safety</strong>
+      <p>{riskResult.ai.margin_safety_explanation}</p>
+    </div>
 
-                <div style={insightBox}>
-                  <strong>AI Recommended Action</strong>
-                  <p>{riskResult.ai.action}</p>
-                </div>
-              </>
-            ) : (
-              <div style={insightBox}>
-                <strong>Recommendation</strong>
-                <p>{riskResult.analysis.recommendation}</p>
-              </div>
-            )}
+    <div style={insightBox}>
+      <strong>AI Recommended Action</strong>
+      <p>{riskResult.ai.action}</p>
+    </div>
+  </>
+) : (
+  <div style={insightBox}>
+    <strong>Recommendation</strong>
+    <p>{riskResult.analysis.recommendation}</p>
+  </div>
+)}
 
             <div style={modalFooterCustom}>
               <button
@@ -883,7 +832,6 @@ function Products() {
               This action cannot be undone. The product will be permanently
               removed.
             </p>
-
             <div style={{ ...modalFooterCustom, justifyContent: "center" }}>
               <button
                 style={{ ...btnCancelCustom, padding: "10px 20px" }}
@@ -911,6 +859,17 @@ function Products() {
           <div style={modalContentCustom}>
             <h2 style={modalTitleCustom}>Add New Product</h2>
 
+            {feedback.location === "add-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
+
             {modalError && (
               <Alert
                 variant="danger"
@@ -924,140 +883,137 @@ function Products() {
 
             <div style={inputGroup}>
               <label style={labelStyle}>
-                Product Name <span style={requiredStar}>*</span>
-              </label>
 
+  Product Name <span style={requiredStar}>*</span>
+
+</label>
               <input
-                style={inputFieldCustom}
-                placeholder="Enter name"
-                value={newProd.name}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setNewProd({ ...newProd, name: value });
-                  handleCheckMarketProduct(value);
-                }}
-              />
+  style={inputFieldCustom}
+  placeholder="Enter name"
+  value={newProd.name}
+  onChange={(e) => {
+    const value = e.target.value;
+    setNewProd({ ...newProd, name: value });
+    handleCheckMarketProduct(value);
+  }}
+/>
 
-              {marketCheck && (
-                <div
-                  style={{
-                    color: marketCheck.exists ? "#27ae60" : "#e67e22",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    marginTop: "-8px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  {marketCheck.exists
-                    ? "✅ Market data found for this product."
-                    : "⚠️ No market data found. Competitor average may be 0 SAR."}
-                </div>
-              )}
+{marketCheck && (
+  <div
+    style={{
+      color: marketCheck.exists ? "#27ae60" : "#e67e22",
+      fontSize: "13px",
+      fontWeight: "600",
+      marginTop: "-8px",
+      marginBottom: "12px",
+    }}
+  >
+    {marketCheck.exists
+      ? "✅ Market data found for this product."
+      : "⚠️ No market data found. Competitor average may be 0 SAR."}
+  </div>
+)}
             </div>
 
             <div style={inputGroup}>
-              <label style={labelStyle}>
-                Components <span style={requiredStar}>*</span>
-                <span className="help-icon" style={helpIcon}>
-                  ?
-                  <span className="tooltip" style={tooltipBox}>
-                    Select the ingredients used in ONE product recipe, then
-                    enter the amount used.
-                    <br />
-                    Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1
-                    cup.
-                  </span>
-                </span>
-              </label>
+  <label style={labelStyle}>
 
-              <input
-                style={inputFieldCustom}
-                placeholder="Search component..."
-                value={componentSearch}
-                onChange={(e) => setComponentSearch(e.target.value)}
-              />
+  Components <span style={requiredStar}>*</span>
 
-              <div style={componentDropdown}>
-                {filteredComponents.length > 0 ? (
-                  filteredComponents.map((comp) => (
-                    <div
-                      key={comp.id}
-                      style={componentDropdownItem}
-                      onClick={() => {
-                        const alreadySelected = newProd.components.find(
-                          (c) => c.name === comp.name
-                        );
+  <span className="help-icon" style={helpIcon}>
+  ?
+  <span className="tooltip" style={tooltipBox}>
+    Select the ingredients used in ONE product recipe, then enter the amount used.
+    <br />
+    Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.
+  </span>
+</span>
 
-                        if (!alreadySelected) {
-                          setNewProd({
-                            ...newProd,
-                            components: [
-                              ...newProd.components,
-                              { name: comp.name, qty: 1 },
-                            ],
-                          });
-                        }
+</label>
 
-                        setComponentSearch("");
-                      }}
-                    >
-                      {comp.name}
-                    </div>
-                  ))
-                ) : (
-                  <div style={componentDropdownEmpty}>No component found</div>
-                )}
-              </div>
+  <input
+  style={inputFieldCustom}
+  placeholder="Search component..."
+  value={componentSearch}
+  onChange={(e) => setComponentSearch(e.target.value)}
+/>
 
-              <div style={selectedComponentsBox}>
-                {newProd.components.length > 0 ? (
-                  newProd.components.map((comp) => (
-                    <div key={comp.name} style={selectedRecipeChip}>
-                      <span style={selectedRecipeName}>{comp.name}</span>
+<div style={componentDropdown}>
+  {filteredComponents.length > 0 ? (
+    filteredComponents.map((comp) => (
+      <div
+        key={comp.id}
+        style={componentDropdownItem}
+        onClick={() => {
+          const alreadySelected = newProd.components.find(
+            (c) => c.name === comp.name
+          );
 
-                      <input
-                        type="number"
-                        min="0"
-                        style={recipeQtyInput}
-                        value={comp.qty}
-                        onChange={(e) =>
-                          updateQty(comp.name, e.target.value, false)
-                        }
-                      />
+          if (!alreadySelected) {
+            setNewProd({
+              ...newProd,
+              components: [...newProd.components, { name: comp.name, qty: 1 }],
+            });
+          }
 
-                      <span style={recipeUnitText}>
-                        {getComponentUnit(comp.name)}
-                      </span>
+          setComponentSearch("");
+        }}
+      >
+        {comp.name}
+      </div>
+    ))
+  ) : (
+    <div style={componentDropdownEmpty}>No component found</div>
+  )}
+</div>
+  
 
-                      <button
-                        type="button"
-                        style={removeRecipeChipBtn}
-                        onClick={() =>
-                          setNewProd({
-                            ...newProd,
-                            components: newProd.components.filter(
-                              (c) => c.name !== comp.name
-                            ),
-                          })
-                        }
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <span style={{ color: "#999", fontSize: "13px" }}>
-                    No components selected yet.
-                  </span>
-                )}
-              </div>
-            </div>
+  <div style={selectedComponentsBox}>
+    {newProd.components.length > 0 ? (
+      newProd.components.map((comp) => (
+        <div key={comp.name} style={selectedRecipeChip}>
+  <span style={selectedRecipeName}>{comp.name}</span>
+
+  <input
+    type="number"
+    min="1"
+    style={recipeQtyInput}
+    value={comp.qty}
+    onChange={(e) => updateQty(comp.name, e.target.value, false)}
+  />
+
+  <span style={recipeUnitText}>
+    {getComponentUnit(comp.name)}
+  </span>
+
+  <button
+    type="button"
+    style={removeRecipeChipBtn}
+    onClick={() =>
+      setNewProd({
+        ...newProd,
+        components: newProd.components.filter(
+          (c) => c.name !== comp.name
+        ),
+      })
+    }
+  >
+    ×
+  </button>
+</div>
+      ))
+    ) : (
+      <span style={{ color: "#999", fontSize: "13px" }}>
+        No components selected yet.
+      </span>
+    )}
+  </div>
+</div>
 
             <div style={inputGroup}>
               <label style={labelStyle}>
-                Category <span style={requiredStar}>*</span>
-              </label>
-
+  Category <span style={requiredStar}>*</span>
+</label>
               <select
                 style={inputFieldCustom}
                 value={newProd.category_id}
@@ -1075,33 +1031,55 @@ function Products() {
                   ))}
               </select>
 
-              {!showCategoryInput ? (
-                <button
-                  style={btnLink}
-                  onClick={() => setShowCategoryInput(true)}
-                >
-                  + New Category
-                </button>
-              ) : (
-                <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
-                  <input
-                    style={{ ...inputFieldCustom, marginBottom: 0 }}
-                    placeholder="Enter Category Name..."
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                  />
-                  <button
-                    style={{
-                      ...btnMainAdd,
-                      padding: "5px 15px",
-                      marginLeft: 0,
-                    }}
-                    onClick={() => handleAddNewCategory("add")}
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
+            
+             
+{!showCategoryInput ? (
+  <button
+    style={btnLink}
+    onClick={() => setShowCategoryInput(true)}
+  >
+    + New Category
+  </button>
+) : (
+  <>
+    <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
+      <input
+        style={{ ...inputFieldCustom, marginBottom: 0 }}
+        placeholder="Enter Category Name..."
+        value={newCatName}
+        onChange={(e) => setNewCatName(e.target.value)}
+      />
+
+      <button
+        style={{
+          ...btnMainAdd,
+          padding: "5px 15px",
+          marginLeft: 0,
+        }}
+        onClick={handleAddNewCategory}
+      >
+        Add
+      </button>
+    </div>
+
+    {categoryFeedback.message && (
+      <Alert
+        variant={categoryFeedback.type}
+        onClose={() => setCategoryFeedback({ type: "", message: "" })}
+        dismissible
+        style={{
+          marginTop: "10px",
+          borderRadius: "10px",
+          fontWeight: "600",
+        }}
+      >
+        {categoryFeedback.message}
+      </Alert>
+    )}
+  </>
+)}
+
+
             </div>
 
             <div style={modalFooterCustom}>
@@ -1126,6 +1104,29 @@ function Products() {
         <div style={modalOverlay}>
           <div style={modalContentLarge}>
             <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+            <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+
+{feedback.location === "edit-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
+
+            {feedback.location === "edit-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={inlineAlertStyle}
+  >
+    {feedback.message}
+  </Alert>
+)}
 
             {modalError && (
               <Alert
@@ -1141,8 +1142,8 @@ function Products() {
             <div style={gridTwoCols}>
               <div style={inputGroup}>
                 <label style={labelStyle}>
-                  Product Name <span style={requiredStar}>*</span>
-                </label>
+  Product Name <span style={requiredStar}>*</span>
+</label>
                 <input
                   style={inputFieldCustom}
                   value={selectedProduct.name}
@@ -1155,61 +1156,61 @@ function Products() {
                 />
               </div>
 
+<div style={inputGroup}>
+  <label style={labelStyle}>
+    Components <span style={requiredStar}>*</span>
+  <span className="help-icon" style={helpIcon}>
+  ?
+  <span className="tooltip" style={tooltipBox}>
+    Select the ingredients used in ONE product recipe, then enter the amount used.
+    <br />
+    Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.
+  </span>
+</span>
+  </label>
+
+  <div style={compSelectionGrid}>
+    {varComponents.map((comp) => {
+      const isSelected = selectedProduct.components?.find(
+        (c) => c.name === comp.name
+      );
+
+      return (
+        <div key={comp.id} style={recipeComponentCard(isSelected)}>
+          <div
+            onClick={() => toggleComponent(comp.name, true)}
+            style={recipeComponentName(isSelected)}
+          >
+            {comp.name}
+          </div>
+
+          {isSelected && (
+            <>
+              <input
+                type="number"
+                min="1"
+                style={recipeQtyInput}
+                value={isSelected.qty}
+                onChange={(e) =>
+                  updateQty(comp.name, e.target.value, true)
+                }
+              />
+
+              <span style={recipeUnitText}>
+                {comp.unit}
+              </span>
+            </>
+          )}
+        </div>
+      );
+    })}
+  </div>
+</div>
+
               <div style={inputGroup}>
                 <label style={labelStyle}>
-                  Components <span style={requiredStar}>*</span>
-                  <span className="help-icon" style={helpIcon}>
-                    ?
-                    <span className="tooltip" style={tooltipBox}>
-                      Select the ingredients used in ONE product recipe, then
-                      enter the amount used.
-                      <br />
-                      Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup,
-                      1 cup.
-                    </span>
-                  </span>
-                </label>
-
-                <div style={compSelectionGrid}>
-                  {varComponents.map((comp) => {
-                    const isSelected = selectedProduct.components?.find(
-                      (c) => c.name === comp.name
-                    );
-
-                    return (
-                      <div key={comp.id} style={recipeComponentCard(isSelected)}>
-                        <div
-                          onClick={() => toggleComponent(comp.name, true)}
-                          style={recipeComponentName(isSelected)}
-                        >
-                          {comp.name}
-                        </div>
-
-                        {isSelected && (
-                          <>
-                            <input
-                              type="number"
-                              min="0"
-                              style={recipeQtyInput}
-                              value={isSelected.qty}
-                              onChange={(e) =>
-                                updateQty(comp.name, e.target.value, true)
-                              }
-                            />
-
-                            <span style={recipeUnitText}>{comp.unit}</span>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div style={inputGroup}>
-                <label style={labelStyle}>
-                  Current Price (SAR) <span style={requiredStar}>*</span>
-                </label>
+  Current Price (SAR) <span style={requiredStar}>*</span>
+</label>
                 <input
                   type="text"
                   placeholder="0.00"
@@ -1225,15 +1226,13 @@ function Products() {
               </div>
 
               <div style={inputGroup}>
-                <label style={labelStyle}>
-                  Competitor Price (from Market Dataset)
-                </label>
-                <input
-                  type="text"
-                  style={{ ...inputFieldCustom, backgroundColor: "#f9f9f9" }}
-                  value="Calculated automatically during pricing analysis"
-                  disabled
-                />
+                <label style={labelStyle}>Competitor Price (from Market Dataset)</label>
+<input
+  type="text"
+  style={{ ...inputFieldCustom, backgroundColor: "#f9f9f9" }}
+  value="Calculated automatically during pricing analysis"
+  disabled
+/>
               </div>
 
               <div style={inputGroup}>
@@ -1256,7 +1255,6 @@ function Products() {
                 <label style={labelStyle}>
                   Category <span style={requiredStar}>*</span>
                 </label>
-
                 <select
                   style={inputFieldCustom}
                   value={selectedProduct.category_id || ""}
@@ -1339,84 +1337,48 @@ function Products() {
       {showRulesModal && (
         <div style={modalOverlay}>
           <div style={modalContentCustom}>
-            <h2 style={modalTitleCustom}>Assign Pricing Rules</h2>
+            <h2 style={modalTitleCustom}>Pricing Rules</h2>
 
-            {assignmentTargetLabel && (
-              <div style={assignmentTargetBox}>{assignmentTargetLabel}</div>
-            )}
-
-            <div style={assignRulesNote}>
-  Assigned rules are saved here, then applied when pricing analysis is
-  generated or refreshed.
-</div>
-
-            <div style={rulesListContainer}>
-              {pricingRules.length > 0 ? (
-                pricingRules.map((rule) => {
-                  const isSelected = tempSelectedRules.includes(rule.id);
-                  const wasAlreadyAssigned = initialAssignedRuleIds.includes(
-                    rule.id
-                  );
-                  const willBeRemoved = wasAlreadyAssigned && !isSelected;
-
-                  return (
-                    <div
-                      key={rule.id}
-                      style={ruleCardStyle(
-                        isSelected,
-                        wasAlreadyAssigned,
-                        willBeRemoved
-                      )}
-                      onClick={() => {
-                        setTempSelectedRules((prev) => {
-                          if (prev.includes(rule.id)) {
-                            return prev.filter((id) => id !== rule.id);
-                          }
-
-                          return getUniqueIds([...prev, rule.id]);
-                        });
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        readOnly
-                      />
-
-                      <div style={ruleCardContent}>
-                        <div style={{ fontWeight: "bold", fontSize: "14px" }}>
-                          {rule.name}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#888" }}>
-                          {getRuleDisplayName(rule.type)} •{" "}
-                          {getRuleDisplayValue(rule)}
-                        </div>
-                      </div>
-
-                      {wasAlreadyAssigned && isSelected && (
-                        <span style={alreadyAssignedBadge}>
-                          Already assigned
-                        </span>
-                      )}
-
-                      {willBeRemoved && (
-                        <span style={willRemoveBadge}>Will remove</span>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <p style={{ color: "#777", margin: 0 }}>
-                  No pricing rules found.
-                </p>
-              )}
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
+              {pricingRules.map((rule) => (
+  <div
+    key={rule.id}
+    style={ruleCardStyle(tempSelectedRules.includes(rule.id))}
+    onClick={() => {
+      setTempSelectedRules((prev) =>
+        prev.includes(rule.id)
+          ? prev.filter((id) => id !== rule.id)
+          : [...prev, rule.id]
+      );
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={tempSelectedRules.includes(rule.id)}
+      readOnly
+    />
+    <div style={{ marginLeft: "10px" }}>
+      <div style={{ fontWeight: "bold", fontSize: "14px" }}>
+        {rule.name}
+      </div>
+      <div style={{ fontSize: "11px", color: "#888" }}>
+        {rule.type} - {rule.value}
+      </div>
+    </div>
+  </div>
+))}
             </div>
 
             <div style={modalFooterCustom}>
               <button style={btnSaveCustom} onClick={handleSaveRules}>
                 Assign Rules
               </button>
-              <button style={btnCancelCustom} onClick={closeRulesModal}>
+              <button
+                style={btnCancelCustom}
+                onClick={() => setShowRulesModal(false)}
+              >
                 Cancel
               </button>
             </div>
@@ -1426,6 +1388,8 @@ function Products() {
     </div>
   );
 }
+
+
 
 const pageContainer = {
   padding: "40px",
@@ -1473,6 +1437,7 @@ const categoryCard = {
   padding: "25px",
   marginBottom: "30px",
   boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+  overflow: "visible",
 };
 
 const categoryHeader = {
@@ -1490,7 +1455,7 @@ const catTitleText = {
 };
 
 const btnAssignRules = {
-  backgroundColor: "#f39c12",
+  backgroundColor: "#3498db",
   color: "white",
   border: "none",
   padding: "8px 18px",
@@ -1500,8 +1465,15 @@ const btnAssignRules = {
 };
 
 const tableStyle = {
+
   width: "100%",
   borderCollapse: "collapse",
+};
+const tableScrollWrap = {
+  width: "100%",
+  overflowX: "visible",
+  overflowY: "visible",
+  paddingBottom: "8px",
 };
 
 const thStyle = {
@@ -1525,7 +1497,7 @@ const badgeRow = {
 };
 
 const orangeBadgeSmall = {
-  backgroundColor: "#f39c12",
+  backgroundColor: "#3498db",
   color: "white",
   fontSize: "10px",
   padding: "3px 8px",
@@ -1618,14 +1590,12 @@ const actionBtnRed = {
 
 const modalOverlay = {
   position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100%",
-  height: "100%",
+  inset: 0,
   backgroundColor: "rgba(0,0,0,0.4)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
+  padding: "24px",
   zIndex: 1000,
 };
 
@@ -1659,12 +1629,16 @@ const modalContentCustom = {
   backgroundColor: "white",
   padding: "35px",
   borderRadius: "25px",
-  width: "450px",
+  width: "760px",
+  maxWidth: "90vw",
+  maxHeight: "90vh",
+  overflowY: "auto",
 };
 
 const modalContentLarge = {
   ...modalContentCustom,
-  width: "750px",
+  width: "980px",
+  maxWidth: "92vw",
 };
 
 const riskModalContent = {
@@ -1871,77 +1845,15 @@ const qtyInputSmall = {
   fontWeight: "bold",
 };
 
-const rulesListContainer = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "10px",
-};
-
-const assignmentTargetBox = {
-  backgroundColor: "#f9f6ff",
-  border: "1px solid #eadcff",
-  color: "#5b2d89",
-  fontSize: "13px",
-  fontWeight: "800",
-  padding: "10px 12px",
-  borderRadius: "12px",
-  marginBottom: "15px",
-};
-
-const assignRulesNote = {
-  backgroundColor: "#f8fafc",
-  border: "1px solid #e5e7eb",
-  color: "#64748b",
-  fontSize: "12px",
-  fontWeight: "700",
-  padding: "10px 12px",
-  borderRadius: "12px",
-  marginBottom: "15px",
-  lineHeight: 1.5,
-};
-
-const ruleCardStyle = (isSelected, wasAlreadyAssigned, willBeRemoved) => ({
+const ruleCardStyle = (isSelected) => ({
   display: "flex",
   alignItems: "center",
-  gap: "10px",
   padding: "12px",
   borderRadius: "12px",
   border: isSelected ? "2px solid #5b2d89" : "1px solid #eee",
   cursor: "pointer",
-  backgroundColor: willBeRemoved
-    ? "#fff7ed"
-    : isSelected
-    ? "#f9f6ff"
-    : wasAlreadyAssigned
-    ? "#f9fafb"
-    : "white",
+  backgroundColor: isSelected ? "#f9f6ff" : "white",
 });
-
-const ruleCardContent = {
-  marginLeft: "4px",
-  flex: 1,
-  minWidth: 0,
-};
-
-const alreadyAssignedBadge = {
-  backgroundColor: "#ede9fe",
-  color: "#5b2d89",
-  padding: "5px 9px",
-  borderRadius: "999px",
-  fontSize: "11px",
-  fontWeight: "900",
-  whiteSpace: "nowrap",
-};
-
-const willRemoveBadge = {
-  backgroundColor: "#ffedd5",
-  color: "#9a3412",
-  padding: "5px 9px",
-  borderRadius: "999px",
-  fontSize: "11px",
-  fontWeight: "900",
-  whiteSpace: "nowrap",
-};
 
 const riskHeaderBox = {
   display: "flex",
@@ -1999,7 +1911,6 @@ const insightBox = {
   marginBottom: "15px",
   fontSize: "14px",
 };
-
 const recommendedBox = {
   backgroundColor: "#eefaf3",
   borderLeft: "5px solid #27ae60",
@@ -2007,27 +1918,6 @@ const recommendedBox = {
   padding: "18px",
   marginBottom: "20px",
   color: "#1e5631",
-};
-
-const appliedRulesBox = {
-  backgroundColor: "#fff7ed",
-  borderLeft: "5px solid #f59e0b",
-  borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "20px",
-  color: "#7c2d12",
-  fontSize: "14px",
-};
-
-const appliedRuleList = {
-  margin: "10px 0 0",
-  paddingLeft: "18px",
-};
-
-const appliedRuleItem = {
-  marginBottom: "6px",
-  lineHeight: 1.5,
-  fontWeight: "600",
 };
 
 const componentDropdown = {
@@ -2116,6 +2006,37 @@ const removeChipBtn = {
   lineHeight: "1",
 };
 
+const competitorPriceHint = {
+  position: "relative",
+  cursor: "help",
+  fontWeight: "700",
+};
+
+const competitorZeroHint = {
+  position: "relative",
+  cursor: "help",
+  color: "#e67e22",
+  fontWeight: "700",
+};
+
+const competitorTooltipBox = {
+  visibility: "hidden",
+  opacity: 0,
+  position: "absolute",
+  right: 0,
+  top: 28,
+  width: 260,
+  background: "#111827",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.6,
+  zIndex: 10000,
+  transition: "opacity 0.2s ease",
+};
+
 const recipeComponentCard = (isSelected) => ({
   display: "flex",
   alignItems: "center",
@@ -2154,6 +2075,12 @@ const recipeUnitText = {
 const requiredStar = {
   color: "#e74c3c",
   fontWeight: "bold",
+};
+
+const inlineAlertStyle = {
+  marginBottom: "16px",
+  borderRadius: "10px",
+  fontWeight: "600",
 };
 
 export default Products;
