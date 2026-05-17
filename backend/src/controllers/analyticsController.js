@@ -32,8 +32,12 @@ export async function getAnalytics(req, res, next) {
     const summary = salesRecord.visual_summary;
 
     return res.json({
-      top_products: Array.isArray(summary.top_products) ? summary.top_products : [],
-      low_products: Array.isArray(summary.low_products) ? summary.low_products : [],
+      top_products: Array.isArray(summary.top_products)
+        ? summary.top_products
+        : [],
+      low_products: Array.isArray(summary.low_products)
+        ? summary.low_products
+        : [],
       profit: summary.profit ?? 0,
     });
   } catch (error) {
@@ -64,12 +68,16 @@ export async function checkMarketProduct(req, res, next) {
     next(error);
   }
 }
+
 export async function analyzeSingleProduct(req, res, next) {
   try {
     const userId = req.user.id;
     const { productId } = req.params;
 
-    const productInput = await buildProductPricingAnalysisInput(userId, productId);
+    const productInput = await buildProductPricingAnalysisInput(
+      userId,
+      productId
+    );
 
     if (!productInput) {
       return res.status(404).json({
@@ -102,12 +110,12 @@ export async function analyzeSingleProduct(req, res, next) {
           sample_size: productInput.market_sample_size,
         },
         rules: {
-  target_margin: productInput.target_margin,
-  product_rules: productInput.product_rules || [],
-  category_rules: productInput.category_rules || [],
-  season_rules: productInput.season_rules || [],
-},
-season: productInput.active_season || productInput.season,
+          target_margin: productInput.target_margin,
+          product_rules: productInput.product_rules || [],
+          category_rules: productInput.category_rules || [],
+          season_rules: productInput.season_rules || [],
+        },
+        season: productInput.active_season || productInput.season,
         analysis,
       },
     });
@@ -136,6 +144,190 @@ export async function getPricingRiskSummary(req, res, next) {
   }
 }
 
+/* -------------------------------------------------- */
+/* Pricing Rule Helpers */
+/* -------------------------------------------------- */
+
+function normalizeRuleType(type) {
+  return String(type || "").trim().toLowerCase();
+}
+
+function getAllAppliedRules(productInput) {
+  return [
+    ...(productInput.product_rules || []),
+    ...(productInput.season_rules || []),
+    ...(productInput.category_rules || []),
+  ].filter(Boolean);
+}
+
+function findRuleByType(productInput, ruleType) {
+  const normalizedType = normalizeRuleType(ruleType);
+
+  /*
+    Priority:
+    1. Product rules  -> most specific
+    2. Season rules   -> active seasonal context
+    3. Category rules -> general category-level policy
+  */
+  return (
+    (productInput.product_rules || []).find(
+      (rule) => normalizeRuleType(rule.type) === normalizedType
+    ) ||
+    (productInput.season_rules || []).find(
+      (rule) => normalizeRuleType(rule.type) === normalizedType
+    ) ||
+    (productInput.category_rules || []).find(
+      (rule) => normalizeRuleType(rule.type) === normalizedType
+    ) ||
+    null
+  );
+}
+
+function roundUpToPriceEnding(price, ending) {
+  const numericPrice = Number(price);
+  const numericEnding = Number(ending);
+
+  if (!Number.isFinite(numericPrice)) return 0;
+
+  if (numericEnding === 0) {
+    return Number(Math.ceil(numericPrice).toFixed(2));
+  }
+
+  const wholeNumber = Math.floor(numericPrice);
+  let roundedPrice = wholeNumber + numericEnding;
+
+  if (roundedPrice < numericPrice) {
+    roundedPrice = wholeNumber + 1 + numericEnding;
+  }
+
+  return Number(roundedPrice.toFixed(2));
+}
+
+function applyPricingRulesToRecommendation(productInput, initialPrice) {
+  const baseCost = Number(productInput.base_cost) || 0;
+  let finalPrice = Number(initialPrice) || 0;
+
+  const appliedRules = [];
+
+  const profitMarginRule = findRuleByType(productInput, "profit margin");
+  const minimumMarginRule = findRuleByType(productInput, "minimum margin");
+  const maximumPriceRule = findRuleByType(productInput, "maximum price");
+  const roundingRule = findRuleByType(productInput, "rounding");
+
+  /*
+    Profit Margin Rule:
+    If the current recommendation is lower than the target profit price,
+    raise it to protect the intended profit.
+  */
+  if (profitMarginRule && baseCost > 0) {
+    const marginPercent = Number(profitMarginRule.value);
+
+    if (Number.isFinite(marginPercent) && marginPercent > 0) {
+      const profitPrice = Number(
+        (baseCost * (1 + marginPercent / 100)).toFixed(2)
+      );
+
+      if (finalPrice < profitPrice) {
+        finalPrice = profitPrice;
+        appliedRules.push(
+          `Profit Margin Rule applied: price raised to keep ${marginPercent}% profit above base cost`
+        );
+      }
+    }
+  }
+
+  /*
+    Minimum Margin Protection:
+    This is a safety rule. It prevents the recommended price
+    from going below the minimum allowed margin.
+  */
+  if (minimumMarginRule && baseCost > 0) {
+    const marginPercent = Number(minimumMarginRule.value);
+
+    if (Number.isFinite(marginPercent) && marginPercent > 0) {
+      const minimumSafePrice = Number(
+        (baseCost * (1 + marginPercent / 100)).toFixed(2)
+      );
+
+      if (finalPrice < minimumSafePrice) {
+        finalPrice = minimumSafePrice;
+        appliedRules.push(
+          `Minimum Margin Protection applied: price raised to protect ${marginPercent}% minimum margin`
+        );
+      }
+    }
+  }
+
+  /*
+    Maximum Price Limit:
+    Caps the recommended price if it exceeds the maximum allowed value.
+  */
+  if (maximumPriceRule) {
+    const maximumPrice = Number(maximumPriceRule.value);
+
+    if (
+      Number.isFinite(maximumPrice) &&
+      maximumPrice > 0 &&
+      finalPrice > maximumPrice
+    ) {
+      finalPrice = maximumPrice;
+      appliedRules.push(
+        `Maximum Price Limit applied: price capped at ${maximumPrice.toFixed(
+          2
+        )} SAR`
+      );
+    }
+  }
+
+  /*
+    Rounding Rule:
+    Adjusts the final price ending, such as 0.99 or 0.50.
+  */
+  if (roundingRule) {
+    const roundingValue = Number(roundingRule.value);
+
+    if (Number.isFinite(roundingValue)) {
+      const beforeRounding = finalPrice;
+      finalPrice = roundUpToPriceEnding(finalPrice, roundingValue);
+
+      if (finalPrice !== beforeRounding) {
+        appliedRules.push(
+          `Rounding Rule applied: final price adjusted to end with ${roundingValue.toFixed(
+            2
+          )}`
+        );
+      }
+    }
+  }
+
+  /*
+    Safety check:
+    Rounding may increase the price, so the maximum cap is applied again.
+  */
+  if (maximumPriceRule) {
+    const maximumPrice = Number(maximumPriceRule.value);
+
+    if (
+      Number.isFinite(maximumPrice) &&
+      maximumPrice > 0 &&
+      finalPrice > maximumPrice
+    ) {
+      finalPrice = maximumPrice;
+      appliedRules.push(
+        `Maximum Price Limit re-applied after rounding: final price capped at ${maximumPrice.toFixed(
+          2
+        )} SAR`
+      );
+    }
+  }
+
+  return {
+    finalPrice: Number(finalPrice.toFixed(2)),
+    appliedRules,
+    allRules: getAllAppliedRules(productInput),
+  };
+}
+
 function buildFallbackRecommendedPrice(productInput) {
   const baseCost = Number(productInput.base_cost) || 0;
   const competitorAverage = Number(productInput.competitor_average_price) || 0;
@@ -161,7 +353,10 @@ export async function getAIPriceRecommendation(req, res, next) {
     const userId = req.user.id;
     const { productId } = req.params;
 
-    const productInput = await buildProductPricingAnalysisInput(userId, productId);
+    const productInput = await buildProductPricingAnalysisInput(
+      userId,
+      productId
+    );
 
     if (!productInput) {
       return res.status(404).json({
@@ -175,11 +370,15 @@ export async function getAIPriceRecommendation(req, res, next) {
     let aiRecommendation;
 
     try {
-      aiRecommendation = await generateAIPriceRecommendation(productInput, analysis);
+      aiRecommendation = await generateAIPriceRecommendation(
+        productInput,
+        analysis
+      );
     } catch (aiError) {
       console.error("Gemini recommendation error:", aiError.message);
 
-      const fallbackRecommendedPrice = buildFallbackRecommendedPrice(productInput);
+      const fallbackRecommendedPrice =
+        buildFallbackRecommendedPrice(productInput);
 
       aiRecommendation = {
         recommended_price: fallbackRecommendedPrice,
@@ -198,39 +397,43 @@ export async function getAIPriceRecommendation(req, res, next) {
       };
     }
 
-    const marginRule =
-  productInput.product_rules?.find((rule) =>
-    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
-  ) ||
-  productInput.category_rules?.find((rule) =>
-    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
-  ) ||
-  productInput.season_rules?.find((rule) =>
-    ["minimum margin", "profit margin"].includes(String(rule.type).toLowerCase())
-  );
+    const aiSuggestedPrice = Number(aiRecommendation?.recommended_price);
+    const initialRecommendedPrice =
+      Number.isFinite(aiSuggestedPrice) && aiSuggestedPrice > 0
+        ? aiSuggestedPrice
+        : buildFallbackRecommendedPrice(productInput);
 
-const marginPercent = Number(marginRule?.value || 30);
+    const ruleBasedResult = applyPricingRulesToRecommendation(
+      productInput,
+      initialRecommendedPrice
+    );
 
-const minimumSafePrice = Number(
-  (productInput.base_cost * (1 + marginPercent / 100)).toFixed(2)
-);
+    aiRecommendation.recommended_price = ruleBasedResult.finalPrice;
 
-if (
-  !aiRecommendation.recommended_price ||
-  aiRecommendation.recommended_price < minimumSafePrice
-) {
-  aiRecommendation.recommended_price = minimumSafePrice;
-  aiRecommendation.recommendation_type =
-    minimumSafePrice > productInput.current_price ? "increase" : "maintain";
-  aiRecommendation.reason =
-    `Adjusted to protect at least ${marginPercent}% margin based on product cost.`;
-}
+    aiRecommendation.recommendation_type =
+      ruleBasedResult.finalPrice > productInput.current_price
+        ? "increase"
+        : ruleBasedResult.finalPrice < productInput.current_price
+        ? "decrease"
+        : "maintain";
+
+    if (ruleBasedResult.appliedRules.length > 0) {
+      const originalReason = aiRecommendation.reason
+        ? `${aiRecommendation.reason} `
+        : "";
+
+      aiRecommendation.reason = `${originalReason}Applied pricing rules: ${ruleBasedResult.appliedRules.join(
+        "; "
+      )}.`;
+    }
+
+    aiRecommendation.applied_rules = ruleBasedResult.appliedRules;
 
     await updateRecommendedPriceById(
-  productInput.product_id,
-  userId,
-  aiRecommendation.recommended_price
-);
+      productInput.product_id,
+      userId,
+      aiRecommendation.recommended_price
+    );
 
     return res.json({
       success: true,
@@ -254,6 +457,11 @@ if (
         },
         rules: {
           target_margin: productInput.target_margin,
+          product_rules: productInput.product_rules || [],
+          category_rules: productInput.category_rules || [],
+          season_rules: productInput.season_rules || [],
+          applied_rules: ruleBasedResult.appliedRules,
+          all_rules: ruleBasedResult.allRules,
         },
         season: productInput.season,
         analysis,

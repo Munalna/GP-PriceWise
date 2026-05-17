@@ -9,7 +9,7 @@ export async function createSeason({ name, startDate, endDate }) {
   const res = await api.post("/seasons", {
     season_name: name,
     start_date: startDate,
-    end_date: endDate
+    end_date: endDate,
   });
 
   return res.data;
@@ -19,7 +19,7 @@ export async function updateSeason(id, { name, startDate, endDate }) {
   const res = await api.patch(`/seasons/${id}`, {
     season_name: name,
     start_date: startDate,
-    end_date: endDate
+    end_date: endDate,
   });
 
   return res.data;
@@ -35,7 +35,13 @@ export async function fetchPricingRules() {
   return res.data;
 }
 
-export async function assignSeasonRules(seasonId, rules) {
-  const res = await api.put(`/seasons/${seasonId}/rules`, { rules });
+export async function assignSeasonRules(seasonId, ruleIds) {
+  const selectedRuleIds = Array.isArray(ruleIds) ? ruleIds : [ruleIds];
+
+  const res = await api.put(`/seasons/${seasonId}/rules`, {
+    ruleIds: selectedRuleIds,
+    rules: selectedRuleIds,
+  });
+
   return res.data;
 }

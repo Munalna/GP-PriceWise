@@ -14,6 +14,10 @@ const ALLOWED_RULE_TYPES = [
   "profit margin",
 ];
 
+const PROFIT_MARGIN_VALUES = [10, 15, 20, 25, 30, 35, 40, 50, 60];
+const MINIMUM_MARGIN_VALUES = [5, 10, 15, 20, 25, 30, 35, 40, 50];
+const ROUNDING_VALUES = [0, 0.5, 0.99];
+
 function normalizeRuleType(ruleType) {
   return String(ruleType || "").trim().toLowerCase();
 }
@@ -22,9 +26,88 @@ function isValidRuleType(ruleType) {
   return ALLOWED_RULE_TYPES.includes(normalizeRuleType(ruleType));
 }
 
+function isEmpty(value) {
+  return value === undefined || value === null || String(value).trim() === "";
+}
+
 function parseRuleValue(value) {
   const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasMaxTwoDecimals(value) {
+  return /^\d+(\.\d{1,2})?$/.test(String(value).trim());
+}
+
+function validateRuleValue(type, rawValue) {
+  const normalizedType = normalizeRuleType(type);
+  const value = parseRuleValue(rawValue);
+
+  if (value === null) {
+    return {
+      valid: false,
+      message: "value must be a valid number",
+    };
+  }
+
+  if (normalizedType === "profit margin") {
+    if (!PROFIT_MARGIN_VALUES.includes(value)) {
+      return {
+        valid: false,
+        message: `Profit margin must be one of: ${PROFIT_MARGIN_VALUES.join(
+          "%, "
+        )}%`,
+      };
+    }
+  }
+
+  if (normalizedType === "minimum margin") {
+    if (!MINIMUM_MARGIN_VALUES.includes(value)) {
+      return {
+        valid: false,
+        message: `Minimum margin must be one of: ${MINIMUM_MARGIN_VALUES.join(
+          "%, "
+        )}%`,
+      };
+    }
+  }
+
+  if (normalizedType === "maximum price") {
+    if (value <= 0) {
+      return {
+        valid: false,
+        message: "Maximum price must be greater than 0",
+      };
+    }
+
+    if (value > 9999) {
+      return {
+        valid: false,
+        message: "Maximum price is too high",
+      };
+    }
+
+    if (!hasMaxTwoDecimals(rawValue)) {
+      return {
+        valid: false,
+        message: "Maximum price can have up to two decimal places only",
+      };
+    }
+  }
+
+  if (normalizedType === "rounding") {
+    if (!ROUNDING_VALUES.includes(value)) {
+      return {
+        valid: false,
+        message: "Rounding value must be 0.00, 0.50, or 0.99",
+      };
+    }
+  }
+
+  return {
+    valid: true,
+    value,
+  };
 }
 
 export async function getUserPricingRules(req, res, next) {
@@ -43,34 +126,33 @@ export async function addPricingRule(req, res, next) {
     const type = req.body.type ?? req.body.rule_type;
     const rawValue = req.body.value ?? req.body.rule_value;
 
-    if (!name || !type || rawValue === undefined || rawValue === null || rawValue === "") {
+    if (isEmpty(name) || isEmpty(type) || isEmpty(rawValue)) {
       return res.status(400).json({
         message: "name, type, and value are required",
       });
     }
 
-    if (!isValidRuleType(type)) {
+    const trimmedName = String(name).trim();
+    const normalizedType = normalizeRuleType(type);
+
+    if (!isValidRuleType(normalizedType)) {
       return res.status(400).json({
-        message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(", ")}`,
+        message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(
+          ", "
+        )}`,
       });
     }
 
-    const value = parseRuleValue(rawValue);
-    if (value === null) {
+    const validation = validateRuleValue(normalizedType, rawValue);
+    if (!validation.valid) {
       return res.status(400).json({
-        message: "value must be a valid number",
-      });
-    }
-
-    if (value < 0) {
-      return res.status(400).json({
-        message: "value cannot be negative",
+        message: validation.message,
       });
     }
 
     const userId = req.user.id;
 
-    const existing = await getPricingRuleByName(userId, name.trim());
+    const existing = await getPricingRuleByName(userId, trimmedName);
     if (existing) {
       return res.status(409).json({
         message: "Pricing rule name already exists",
@@ -78,9 +160,9 @@ export async function addPricingRule(req, res, next) {
     }
 
     const created = await createPricingRule(userId, {
-      name: name.trim(),
-      type,
-      value,
+      name: trimmedName,
+      type: normalizedType,
+      value: validation.value,
     });
 
     res.status(201).json(created);
@@ -110,8 +192,17 @@ export async function editPricingRule(req, res, next) {
       return res.status(404).json({ message: "Pricing rule not found" });
     }
 
+    let trimmedName;
     if (name !== undefined) {
-      const existing = await getPricingRuleByName(userId, name.trim());
+      if (isEmpty(name)) {
+        return res.status(400).json({
+          message: "Rule name cannot be empty",
+        });
+      }
+
+      trimmedName = String(name).trim();
+
+      const existing = await getPricingRuleByName(userId, trimmedName);
       if (existing && String(existing.id) !== String(id)) {
         return res.status(409).json({
           message: "Pricing rule name already exists",
@@ -119,32 +210,48 @@ export async function editPricingRule(req, res, next) {
       }
     }
 
-    if (type !== undefined && !isValidRuleType(type)) {
-      return res.status(400).json({
-        message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(", ")}`,
-      });
+    let normalizedType;
+    if (type !== undefined) {
+      if (isEmpty(type)) {
+        return res.status(400).json({
+          message: "Rule type cannot be empty",
+        });
+      }
+
+      normalizedType = normalizeRuleType(type);
+
+      if (!isValidRuleType(normalizedType)) {
+        return res.status(400).json({
+          message: `Invalid rule type. Allowed types are: ${ALLOWED_RULE_TYPES.join(
+            ", "
+          )}`,
+        });
+      }
     }
 
     let value;
     if (rawValue !== undefined) {
-      value = parseRuleValue(rawValue);
-
-      if (value === null) {
+      if (isEmpty(rawValue)) {
         return res.status(400).json({
-          message: "value must be a valid number",
+          message: "Value cannot be empty",
         });
       }
 
-      if (value < 0) {
+      const effectiveType = normalizedType || currentRule.type;
+      const validation = validateRuleValue(effectiveType, rawValue);
+
+      if (!validation.valid) {
         return res.status(400).json({
-          message: "value cannot be negative",
+          message: validation.message,
         });
       }
+
+      value = validation.value;
     }
 
     const updated = await updatePricingRule(userId, id, {
-      name: name !== undefined ? name.trim() : undefined,
-      type,
+      name: name !== undefined ? trimmedName : undefined,
+      type: type !== undefined ? normalizedType : undefined,
       value,
     });
 

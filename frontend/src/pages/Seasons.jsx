@@ -24,47 +24,110 @@ const normalize = (row) => ({
 ───────────────────────────────────────────── */
 function getSeasonStatus(season) {
   if (!season.startDate || !season.endDate) return "upcoming";
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
   const start = new Date(season.startDate);
   const end = new Date(season.endDate);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
+
   if (today > end) return "passed";
   if (today >= start && today <= end) return "active";
   return "upcoming";
 }
 
 const STATUS_CONFIG = {
-  active:   { label: "Active",   bg: "#1f9d55" },
-  passed:   { label: "Passed",   bg: "#b45309" },
+  active: { label: "Active", bg: "#1f9d55" },
+  passed: { label: "Passed", bg: "#b45309" },
   upcoming: { label: "Upcoming", bg: "#2563eb" },
 };
 
 const STATUS_ORDER = { active: 0, upcoming: 1, passed: 2 };
+
+function normalizeRuleType(type) {
+  return String(type || "").trim().toLowerCase();
+}
+
+function getRuleDisplayName(type) {
+  const ruleType = normalizeRuleType(type);
+
+  if (ruleType === "profit margin") return "Profit Margin Rule";
+  if (ruleType === "minimum margin") return "Minimum Margin Protection";
+  if (ruleType === "maximum price") return "Maximum Price Limit";
+  if (ruleType === "rounding") return "Rounding Rule";
+
+  return type || "Pricing Rule";
+}
+
+function getRuleDisplayValue(rule) {
+  if (
+    !rule ||
+    rule.value === "" ||
+    rule.value === null ||
+    rule.value === undefined
+  ) {
+    return "-";
+  }
+
+  const ruleType = normalizeRuleType(rule.type);
+  const value = Number(rule.value);
+
+  if (ruleType === "rounding" && Number.isFinite(value)) {
+    if (value === 0) return "0.00 — round to whole SAR";
+    if (value === 0.5) return "0.50 — price ends with .50";
+    if (value === 0.99) return "0.99 — price ends with .99";
+    return value.toFixed(2);
+  }
+
+  if (ruleType === "maximum price" && Number.isFinite(value)) {
+    return `${value.toFixed(2)} SAR`;
+  }
+
+  if (
+    (ruleType === "profit margin" || ruleType === "minimum margin") &&
+    Number.isFinite(value)
+  ) {
+    return `${value}%`;
+  }
+
+  return String(rule.value);
+}
+
+function getUniqueIds(ids = []) {
+  return [...new Set(ids.filter(Boolean))];
+}
 
 /* ─────────────────────────────────────────────
    Main Page
 ───────────────────────────────────────────── */
 export default function Seasons() {
   const queryClient = useQueryClient();
+
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [initialAssignedRuleIds, setInitialAssignedRuleIds] = useState([]);
+
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Auto-dismiss success message after 4 seconds
   useEffect(() => {
     if (!successMsg) return;
+
     const timer = setTimeout(() => setSuccessMsg(""), 4000);
     return () => clearTimeout(timer);
   }, [successMsg]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["seasons"] });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["seasons"] });
 
   const { data: seasons = [], isLoading: loading } = useQuery({
     queryKey: ["seasons"],
@@ -86,26 +149,51 @@ export default function Seasons() {
     return [...seasons].sort((a, b) => {
       const sa = STATUS_ORDER[getSeasonStatus(a)];
       const sb = STATUS_ORDER[getSeasonStatus(b)];
+
       if (sa !== sb) return sa - sb;
+
       return new Date(a.startDate || 0) - new Date(b.startDate || 0);
     });
   }, [seasons]);
 
-  const openCreate = () => { setEditing(null); setShowModal(true); };
-  const openEdit = (s) => { setEditing(s); setShowModal(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (season) => {
+    setEditing(season);
+    setShowModal(true);
+  };
 
   const openRulesModal = (season) => {
+    const assignedRuleIds = getUniqueIds(
+      (season.rules || []).map((rule) => rule.id)
+    );
+
     setSelectedSeason(season);
-    setTempSelectedRules((season.rules || []).map((rule) => rule.id));
+    setTempSelectedRules(assignedRuleIds);
+    setInitialAssignedRuleIds(assignedRuleIds);
     setShowRulesModal(true);
   };
 
+  const closeRulesModal = () => {
+    setShowRulesModal(false);
+    setSelectedSeason(null);
+    setTempSelectedRules([]);
+    setInitialAssignedRuleIds([]);
+  };
+
   const saveSeasonRules = async () => {
+    if (!selectedSeason) return;
+
     try {
-      await assignSeasonRules(selectedSeason.id, tempSelectedRules);
+      const uniqueRuleIds = getUniqueIds(tempSelectedRules);
+
+      await assignSeasonRules(selectedSeason.id, uniqueRuleIds);
       await invalidate();
-      setShowRulesModal(false);
-      setSelectedSeason(null);
+
+      closeRulesModal();
       setSuccessMsg("Pricing rules assigned successfully.");
     } catch (e) {
       alert(e.message || "Failed to assign rules");
@@ -121,7 +209,9 @@ export default function Seasons() {
         await updateSeason(editing.id, { name, startDate, endDate });
         setSuccessMsg(`"${name}" was updated successfully.`);
       }
+
       await invalidate();
+
       setShowModal(false);
       setEditing(null);
     } catch (e) {
@@ -131,7 +221,9 @@ export default function Seasons() {
 
   const onDeleteConfirmed = async () => {
     if (!deleteTarget) return;
+
     const seasonName = deleteTarget.name;
+
     try {
       await deleteSeason(deleteTarget.id);
       await invalidate();
@@ -152,20 +244,25 @@ export default function Seasons() {
             Manage seasonal periods, pricing rules, dates, and status.
           </p>
         </div>
+
         <button style={styles.primaryBtn} onClick={openCreate} type="button">
           + Create Season
         </button>
       </div>
 
-      {/* Success message — auto-dismisses after 4s */}
       {successMsg && (
         <div style={styles.successBox}>
-          <span>✓  {successMsg}</span>
-          <button style={styles.dismissBtn} onClick={() => setSuccessMsg("")} type="button">✕</button>
+          <span>✓ {successMsg}</span>
+          <button
+            style={styles.dismissBtn}
+            onClick={() => setSuccessMsg("")}
+            type="button"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Error message */}
       {error && (
         <div style={styles.errorBox}>
           <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
@@ -186,11 +283,14 @@ export default function Seasons() {
                   <th style={styles.th}>Season Name</th>
                   <th style={styles.th}>Start Date</th>
                   <th style={styles.th}>End Date</th>
-                  <th style={{ ...styles.th, textAlign: "center" }}>Pricing Rules</th>
+                  <th style={{ ...styles.th, textAlign: "center" }}>
+                    Pricing Rules
+                  </th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Status</th>
                   <th style={{ ...styles.th, textAlign: "center" }}>Actions</th>
                 </tr>
               </thead>
+
               <tbody>
                 {sortedSeasons.length === 0 ? (
                   <tr>
@@ -199,19 +299,21 @@ export default function Seasons() {
                     </td>
                   </tr>
                 ) : (
-                  sortedSeasons.map((s) => {
-                    const status = getSeasonStatus(s);
+                  sortedSeasons.map((season) => {
+                    const status = getSeasonStatus(season);
                     const { label, bg } = STATUS_CONFIG[status];
                     const isPassed = status === "passed";
+
                     return (
-                      <tr key={s.id} style={styles.tr}>
-                        <td style={styles.tdName}>{s.name || "-"}</td>
-                        <td style={styles.td}>{s.startDate || "-"}</td>
-                        <td style={styles.td}>{s.endDate || "-"}</td>
+                      <tr key={season.id} style={styles.tr}>
+                        <td style={styles.tdName}>{season.name || "-"}</td>
+                        <td style={styles.td}>{season.startDate || "-"}</td>
+                        <td style={styles.td}>{season.endDate || "-"}</td>
+
                         <td style={{ ...styles.td, textAlign: "center" }}>
                           <div style={styles.ruleBadges}>
-                            {(s.rules || []).length > 0 ? (
-                              s.rules.map((rule) => (
+                            {(season.rules || []).length > 0 ? (
+                              season.rules.map((rule) => (
                                 <span key={rule.id} style={styles.ruleBadge}>
                                   {rule.name}
                                 </span>
@@ -221,34 +323,49 @@ export default function Seasons() {
                             )}
                           </div>
                         </td>
+
                         <td style={{ ...styles.td, textAlign: "center" }}>
                           <span style={{ ...styles.badge, background: bg }}>
                             {label}
                           </span>
                         </td>
+
                         <td style={{ ...styles.td, textAlign: "center" }}>
                           <div style={styles.actions}>
-                            {/* Assign rules hidden for passed seasons */}
                             {!isPassed && (
                               <button
-                                style={{ ...styles.iconBtn, background: "#382372" }}
-                                onClick={() => openRulesModal(s)}
+                                style={{
+                                  ...styles.iconBtn,
+                                  background: "#382372",
+                                }}
+                                onClick={() => openRulesModal(season)}
                                 type="button"
                                 title="Assign Rules"
-                              >🔗</button>
+                              >
+                                🔗
+                              </button>
                             )}
+
                             <button
                               style={styles.iconBtn}
-                              onClick={() => openEdit(s)}
+                              onClick={() => openEdit(season)}
                               type="button"
                               title="Edit Season"
-                            >✏️</button>
+                            >
+                              ✏️
+                            </button>
+
                             <button
-                              style={{ ...styles.iconBtn, background: "#ef4444" }}
-                              onClick={() => setDeleteTarget(s)}
+                              style={{
+                                ...styles.iconBtn,
+                                background: "#ef4444",
+                              }}
+                              onClick={() => setDeleteTarget(season)}
                               type="button"
                               title="Delete Season"
-                            >🗑️</button>
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -261,59 +378,103 @@ export default function Seasons() {
         )}
       </div>
 
-      {/* Create / Edit modal */}
       {showModal && (
         <SeasonModal
           initial={editing || { name: "", startDate: "", endDate: "" }}
-          onClose={() => { setShowModal(false); setEditing(null); }}
+          onClose={() => {
+            setShowModal(false);
+            setEditing(null);
+          }}
           onSave={onSave}
         />
       )}
 
-      {/* Assign pricing rules modal */}
       {showRulesModal && selectedSeason && (
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0 }}>Assign Rules to {selectedSeason.name}</h3>
-              <button style={styles.closeBtn} onClick={() => setShowRulesModal(false)} type="button">✕</button>
+              <h3 style={{ margin: 0 }}>
+                Assign Rules to {selectedSeason.name}
+              </h3>
+              <button style={styles.closeBtn} onClick={closeRulesModal} type="button">
+                ✕
+              </button>
             </div>
+
             <div style={styles.rulesList}>
               {pricingRules.length > 0 ? (
-                pricingRules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    style={styles.ruleOption}
-                    onClick={() => {
-                      setTempSelectedRules((prev) =>
-                        prev.includes(rule.id)
-                          ? prev.filter((id) => id !== rule.id)
-                          : [...prev, rule.id]
-                      );
-                    }}
-                  >
-                    <input type="checkbox" checked={tempSelectedRules.includes(rule.id)} readOnly />
-                    <div>
-                      <div style={{ fontWeight: 900 }}>{rule.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>
-                        {rule.type} - {rule.value}
+                pricingRules.map((rule) => {
+                  const isSelected = tempSelectedRules.includes(rule.id);
+                  const wasAlreadyAssigned = initialAssignedRuleIds.includes(
+                    rule.id
+                  );
+                  const willBeRemoved = wasAlreadyAssigned && !isSelected;
+
+                  return (
+                    <div
+                      key={rule.id}
+                      style={styles.ruleOption(
+                        isSelected,
+                        wasAlreadyAssigned,
+                        willBeRemoved
+                      )}
+                      onClick={() => {
+                        setTempSelectedRules((prev) => {
+                          if (prev.includes(rule.id)) {
+                            return prev.filter((id) => id !== rule.id);
+                          }
+
+                          return getUniqueIds([...prev, rule.id]);
+                        });
+                      }}
+                    >
+                      <input type="checkbox" checked={isSelected} readOnly />
+
+                      <div style={styles.ruleOptionContent}>
+                        <div style={{ fontWeight: 900 }}>{rule.name}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                          {getRuleDisplayName(rule.type)} •{" "}
+                          {getRuleDisplayValue(rule)}
+                        </div>
                       </div>
+
+                      {wasAlreadyAssigned && isSelected && (
+                        <span style={styles.alreadyAssignedBadge}>
+                          Already assigned
+                        </span>
+                      )}
+
+                      {willBeRemoved && (
+                        <span style={styles.willRemoveBadge}>Will remove</span>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p style={{ color: "#6b7280" }}>No pricing rules found.</p>
               )}
             </div>
+
             <div style={styles.modalFooter}>
-              <button style={styles.secondaryBtn} onClick={() => setShowRulesModal(false)} type="button">Cancel</button>
-              <button style={styles.primaryBtn} onClick={saveSeasonRules} type="button">Assign Rules</button>
+              <button
+                style={styles.secondaryBtn}
+                onClick={closeRulesModal}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.primaryBtn}
+                onClick={saveSeasonRules}
+                type="button"
+              >
+                Assign Rules
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete confirmation */}
       <ConfirmModal
         show={!!deleteTarget}
         title="Delete Season"
@@ -328,10 +489,6 @@ export default function Seasons() {
 
 /* ─────────────────────────────────────────────
    Create / Edit Modal
-   Date rules:
-     - Start date: freely editable, no restrictions
-     - End date: must be after start date — only hard rule
-     - Warning shown in real time when resulting status would be Passed
 ───────────────────────────────────────────── */
 function SeasonModal({ initial, onClose, onSave }) {
   const todayStr = new Date().toISOString().split("T")[0];
@@ -341,15 +498,18 @@ function SeasonModal({ initial, onClose, onSave }) {
   const [endDate, setEndDate] = useState(initial.endDate || "");
   const [formError, setFormError] = useState("");
 
-  // Show a warning (not a block) when both dates are set and end is in the past
   const willBePassed = endDate && endDate < todayStr;
 
   const submit = () => {
     setFormError("");
-    if (!name.trim())        return setFormError("Season name is required.");
-    if (!startDate)          return setFormError("Start date is required.");
-    if (!endDate)            return setFormError("End date is required.");
-    if (endDate <= startDate) return setFormError("End date must be after the start date.");
+
+    if (!name.trim()) return setFormError("Season name is required.");
+    if (!startDate) return setFormError("Start date is required.");
+    if (!endDate) return setFormError("End date is required.");
+    if (endDate <= startDate) {
+      return setFormError("End date must be after the start date.");
+    }
+
     onSave({ name: name.trim(), startDate, endDate });
   };
 
@@ -357,11 +517,14 @@ function SeasonModal({ initial, onClose, onSave }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.modalHeader}>
-          <h3 style={{ margin: 0 }}>{initial?.id ? "Update Season" : "Create Season"}</h3>
-          <button style={styles.closeBtn} onClick={onClose} type="button">✕</button>
+          <h3 style={{ margin: 0 }}>
+            {initial?.id ? "Update Season" : "Create Season"}
+          </h3>
+          <button style={styles.closeBtn} onClick={onClose} type="button">
+            ✕
+          </button>
         </div>
 
-        {/* Season Name */}
         <div style={styles.field}>
           <label style={styles.label}>
             Season Name <span style={styles.requiredStar}>*</span>
@@ -375,7 +538,6 @@ function SeasonModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.grid2}>
-          {/* Start Date — no restrictions */}
           <div style={styles.field}>
             <label style={styles.label}>
               Start Date <span style={styles.requiredStar}>*</span>
@@ -388,7 +550,6 @@ function SeasonModal({ initial, onClose, onSave }) {
             />
           </div>
 
-          {/* End Date — must be after start, no min restriction */}
           <div style={styles.field}>
             <label style={styles.label}>
               End Date <span style={styles.requiredStar}>*</span>
@@ -402,19 +563,22 @@ function SeasonModal({ initial, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Passed warning — shown in real time, not a block */}
         {willBePassed && (
           <div style={styles.passedWarning}>
-            ⚠️ The end date is in the past — this season will be saved as <strong>Passed</strong>.
+            ⚠️ The end date is in the past — this season will be saved as{" "}
+            <strong>Passed</strong>.
           </div>
         )}
 
-        {/* Inline form error */}
         {formError && <div style={styles.formError}>{formError}</div>}
 
         <div style={styles.modalFooter}>
-          <button style={styles.secondaryBtn} onClick={onClose} type="button">Cancel</button>
-          <button style={styles.primaryBtn} onClick={submit} type="button">Save</button>
+          <button style={styles.secondaryBtn} onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button style={styles.primaryBtn} onClick={submit} type="button">
+            Save
+          </button>
         </div>
       </div>
     </div>
@@ -577,15 +741,43 @@ const styles = {
     gap: 10,
     marginTop: 12,
   },
-  ruleOption: {
+  ruleOption: (isSelected, wasAlreadyAssigned, willBeRemoved) => ({
     display: "flex",
     alignItems: "center",
     gap: 10,
     padding: 12,
-    border: "1px solid #e5e7eb",
+    border: isSelected ? "2px solid #382372" : "1px solid #e5e7eb",
     borderRadius: 12,
     cursor: "pointer",
-    background: "#fff",
+    background: willBeRemoved
+      ? "#fff7ed"
+      : isSelected
+      ? "#f5f3ff"
+      : wasAlreadyAssigned
+      ? "#f9fafb"
+      : "#fff",
+  }),
+  ruleOptionContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  alreadyAssignedBadge: {
+    background: "#ede9fe",
+    color: "#382372",
+    padding: "5px 9px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  },
+  willRemoveBadge: {
+    background: "#ffedd5",
+    color: "#9a3412",
+    padding: "5px 9px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: "nowrap",
   },
 
   field: { display: "flex", flexDirection: "column", gap: 8, marginTop: 10 },
