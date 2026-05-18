@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../client";
 import { useNavigate } from "react-router-dom";
 import { Package, DollarSign, SlidersHorizontal, Calendar, BarChart3 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -6,12 +7,33 @@ import { useAuth } from "../context/AuthContext";
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+const [userName, setUserName] = useState("User");
+
+useEffect(() => {
+  const getUserName = async () => {
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("business_name")
+      .eq("user_id", user.id)
+      .single();
+
+    const name = profile?.business_name || user.email?.split("@")[0] || "User";
+    setUserName(name);
+  };
+
+  getUserName();
+}, [user]);
 
   return (
     <div style={page}>
       <section style={heroCard}>
         <div>
-          <h1 style={title}>Welcome back, {user?.user_metadata?.name || "Moon"}</h1>
+            <h1 style={title}>
+ Welcome back, {userName}
+</h1>
+        { /* <h1 style={title}>Welcome back, {user?.user_metadata?.name || "Moon"}</h1> */}
           <p style={subtitle}>
             Your smart pricing workspace for Saudi cafés.
           </p>

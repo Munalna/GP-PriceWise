@@ -373,6 +373,8 @@ const handleSaveRules = async () => {
   }
 };
 
+
+/*
 const handleRenameCategory = async (cat) => {
   const newName = prompt("Enter new category name:", cat.name);
   if (!newName?.trim()) return;
@@ -396,6 +398,12 @@ const handleRenameCategory = async (cat) => {
       `category-${cat.id}`
     );
   }
+}; */
+
+const handleRenameCategory = (cat) => {
+  setSelectedCategory(cat);
+  setEditCatName(cat.name || "");
+  setShowEditCategoryInput(true);
 };
 
 const handleDeleteCategory = async () => {
@@ -481,43 +489,107 @@ const componentHelpText =
 
   <div style={categoryHeader}>
     <div>
-      <div style={categoryTitleRow}>
-        <h2 style={catTitleText}>{cat.name}</h2>
+  <div style={categoryTitleRow}>
+    <h2 style={catTitleText}>{cat.name}</h2>
 
-     <button
-  style={categoryEditBtn}
-  disabled={cat.is_virtual}
-  onClick={() => {
-    if (!cat.is_virtual) handleRenameCategory(cat);
-  }}
-  title="Rename Category"
->
-  <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
-</button>
+    <button
+      style={categoryEditBtn}
+      disabled={cat.is_virtual}
+      onClick={() => {
+        if (!cat.is_virtual) handleRenameCategory(cat);
+      }}
+      title="Rename Category"
+    >
+      <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
+    </button>
 
-<button
-  style={categoryDeleteBtn}
-  disabled={cat.is_virtual}
-  onClick={() => {
-    if (!cat.is_virtual) {
-      setCategoryToDelete(cat);
-      setShowCategoryDeleteConfirm(true);
+    <button
+      style={categoryDeleteBtn}
+      disabled={cat.is_virtual}
+      onClick={() => {
+        if (!cat.is_virtual) {
+          setCategoryToDelete(cat);
+          setShowCategoryDeleteConfirm(true);
+        }
+      }}
+      title="Delete Category"
+    >
+      <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
+    </button>
+  </div>
+
+  {showEditCategoryInput && selectedCategory?.id === cat.id && (
+    <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+      <input
+        style={{ ...inputFieldCustom, marginBottom: 0, maxWidth: "260px" }}
+        value={editCatName}
+        onChange={(e) => setEditCatName(e.target.value)}
+        placeholder="Enter category name"
+      />
+
+      <button
+  style={{ ...btnSaveCustom, padding: "8px 14px" }}
+  onClick={async () => {
+    const trimmedName = editCatName.trim();
+    const currentName = cat.name.trim();
+
+    if (!trimmedName) {
+      showFeedback("danger", "Category name is required.", `category-${cat.id}`);
+      return;
+    }
+
+    if (trimmedName === currentName) {
+      showFeedback("warning", "No changes detected.", `category-${cat.id}`);
+      return;
+    }
+
+    try {
+      await api.put(`/products/categories/${cat.id}`, {
+        name: trimmedName,
+      });
+
+      setShowEditCategoryInput(false);
+      setSelectedCategory(null);
+      setEditCatName("");
+
+      showFeedback("success", "Category updated successfully.", `category-${cat.id}`);
+
+      setTimeout(async () => {
+        await invalidate();
+      }, 800);
+    } catch (err) {
+      showFeedback(
+        "danger",
+        err.response?.data?.error || err.message || "Error updating category.",
+        `category-${cat.id}`
+      );
     }
   }}
-  title="Delete Category"
 >
-  <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
+  Save
 </button>
-      </div>
 
-      <div style={badgeRow}>
-        {(cat.rules || []).map((rule, idx) => (
-          <span key={idx} style={orangeBadgeSmall}>
-            {rule.name}
-          </span>
-        ))}
-      </div>
+      <button
+        style={{ ...btnCancelCustom, padding: "8px 14px" }}
+        onClick={() => {
+          setShowEditCategoryInput(false);
+          setSelectedCategory(null);
+          setEditCatName("");
+        }}
+      >
+        Cancel
+      </button>
     </div>
+  )}
+
+  <div style={badgeRow}>
+    {(cat.rules || []).map((rule, idx) => (
+      <span key={idx} style={orangeBadgeSmall}>
+        {rule.name}
+      </span>
+    ))}
+  </div>
+</div>
 
                  <button
   style={btnAssignRules}
@@ -545,7 +617,7 @@ const componentHelpText =
 
       dismissible
 
-      style={inlineAlertStyle}
+      style={getFeedbackStyle(feedback.type)}
 
     >
 
@@ -1030,7 +1102,7 @@ const componentHelpText =
     variant={feedback.type}
     onClose={() => setFeedback({ type: "", message: "", location: "" })}
     dismissible
-    style={inlineAlertStyle}
+   style={getFeedbackStyle(feedback.type)}
   >
     {feedback.message}
   </Alert>
@@ -1229,19 +1301,17 @@ const componentHelpText =
     </div>
 
     {categoryFeedback.message && (
-      <Alert
-        variant={categoryFeedback.type}
-        onClose={() => setCategoryFeedback({ type: "", message: "" })}
-        dismissible
-        style={{
-          marginTop: "10px",
-          borderRadius: "10px",
-          fontWeight: "600",
-        }}
-      >
-        {categoryFeedback.message}
-      </Alert>
-    )}
+  <div style={{ marginTop: "10px" }}>
+    <Alert
+      variant={categoryFeedback.type}
+      onClose={() => setCategoryFeedback({ type: "", message: "" })}
+      dismissible
+      style={getFeedbackStyle(categoryFeedback.type)}
+    >
+      {categoryFeedback.message}
+    </Alert>
+  </div>
+)}
   </>
 )}
 
@@ -1270,8 +1340,19 @@ const componentHelpText =
         <div style={modalOverlay}>
           <div style={modalContentLarge}>
             <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
-            <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
 
+{feedback.location === "edit-product-modal" && (
+  <Alert
+    variant={feedback.type}
+    onClose={() => setFeedback({ type: "", message: "", location: "" })}
+    dismissible
+    style={getFeedbackStyle(feedback.type)}
+  >
+    {feedback.message}
+  </Alert>
+)}
+{
+/*
 {feedback.location === "edit-product-modal" && (
   <Alert
     variant={feedback.type}
@@ -1282,17 +1363,7 @@ const componentHelpText =
     {feedback.message}
   </Alert>
 )}
-
-            {feedback.location === "edit-product-modal" && (
-  <Alert
-    variant={feedback.type}
-    onClose={() => setFeedback({ type: "", message: "", location: "" })}
-    dismissible
-    style={inlineAlertStyle}
-  >
-    {feedback.message}
-  </Alert>
-)}
+*/}
 
             {modalError && (
               <Alert
@@ -2143,6 +2214,7 @@ const componentDropdownEmpty = {
   fontSize: "13px",
 };
 
+
 const selectedComponentsBox = {
   display: "flex",
   flexWrap: "wrap",
@@ -2292,5 +2364,33 @@ const riskLoadingBox = {
   color: "#2d1b4e",
   fontSize: "14px",
 };
+
+const getFeedbackStyle = (type) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  background: type === "danger" ? "#fff1f2" : type === "warning" ? "#fffbeb" : "#f0fdf4",
+  border:
+    type === "danger"
+      ? "1px solid #fecdd3"
+      : type === "warning"
+      ? "1px solid #fcd34d"
+      : "1px solid #bbf7d0",
+  color:
+    type === "danger"
+      ? "#9f1239"
+      : type === "warning"
+      ? "#92400e"
+      : "#15803d",
+  padding: "10px 14px",
+  borderRadius: 12,
+  marginBottom: 12,
+  fontWeight: 600,
+  fontSize: 14,
+});
+
+
+
 
 export default Products;

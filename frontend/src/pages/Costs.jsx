@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Alert, Spinner } from "react-bootstrap";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -19,6 +19,14 @@ import {
 const Costs = () => {
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+useEffect(() => {
+  if (!successMsg) return;
+
+  const timer = setTimeout(() => setSuccessMsg(""), 4000);
+  return () => clearTimeout(timer);
+}, [successMsg]);
   const [viewMode, setViewMode] = useState("all");
 
   const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
@@ -51,6 +59,19 @@ const Costs = () => {
           </p>
         </div>
       </div>
+
+      {successMsg && (
+  <div style={styles.successBox}>
+    <span>✓ {successMsg}</span>
+    <button
+      style={styles.dismissBtn}
+      onClick={() => setSuccessMsg("")}
+      type="button"
+    >
+      ✕
+    </button>
+  </div>
+)}
 
       {error && <Alert variant="danger">{error}</Alert>}
 
@@ -92,17 +113,20 @@ const Costs = () => {
       <FixedCostsSection
         items={fixedCosts}
         onAdd={async (payload) => {
-          await createFixedCost(payload);
-          await invalidateFixed();
-        }}
-        onEdit={async (id, payload) => {
-          await updateFixedCost(id, payload);
-          await invalidateFixed();
-        }}
-        onDelete={async (id) => {
-          await deleteFixedCost(id);
-          await invalidateFixed();
-        }}
+  await createFixedCost(payload);
+  await invalidateFixed();
+  setSuccessMsg(`"${payload.name}" was created successfully.`);
+}}
+onEdit={async (id, payload) => {
+  await updateFixedCost(id, payload);
+  await invalidateFixed();
+  setSuccessMsg(`"${payload.name}" was updated successfully.`);
+}}
+onDelete={async (id) => {
+  await deleteFixedCost(id);
+  await invalidateFixed();
+  setSuccessMsg("Fixed cost was deleted successfully.");
+}}
       />
     )}
 
@@ -110,17 +134,20 @@ const Costs = () => {
       <VariableComponentsSection
         items={components}
         onAdd={async (payload) => {
-          await createVariableComponent(payload);
-          await invalidateVars();
-        }}
-        onEdit={async (id, payload) => {
-          await updateVariableComponent(id, payload);
-          await invalidateVars();
-        }}
-        onDelete={async (id) => {
-          await deleteVariableComponent(id);
-          await invalidateVars();
-        }}
+  await createVariableComponent(payload);
+  await invalidateVars();
+  setSuccessMsg(`"${payload.name}" was created successfully.`);
+}}
+onEdit={async (id, payload) => {
+  await updateVariableComponent(id, payload);
+  await invalidateVars();
+  setSuccessMsg(`"${payload.name}" was updated successfully.`);
+}}
+onDelete={async (id) => {
+  await deleteVariableComponent(id);
+  await invalidateVars();
+  setSuccessMsg("Variable component was deleted successfully.");
+}}
       />
     )}
   </div>
@@ -198,6 +225,33 @@ filterBtnActive: {
     gap: 10,
     color: "#475569",
   },
+
+
+  successBox: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  background: "#f0fdf4",
+  border: "1px solid #bbf7d0",
+  color: "#15803d",
+  padding: "10px 14px",
+  borderRadius: 12,
+  marginBottom: 12,
+  fontWeight: 600,
+  fontSize: 14,
+},
+
+dismissBtn: {
+  border: "none",
+  background: "transparent",
+  color: "#15803d",
+  cursor: "pointer",
+  fontWeight: 900,
+  fontSize: 14,
+  padding: "0 4px",
+},
+
 };
 
 export default Costs;
