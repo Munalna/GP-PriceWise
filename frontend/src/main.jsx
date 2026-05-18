@@ -9,8 +9,8 @@ import { AuthProvider } from './context/AuthContext.jsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,  // cache stays fresh for 5 minutes
-      retry: 1,                   // only retry failed requests once
+      staleTime: 1000 * 60 * 60,  // 1 hour
+      retry: 1,                   
     },
   },
 })

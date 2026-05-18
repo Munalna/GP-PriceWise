@@ -117,10 +117,14 @@ export function buildDailyReportPdf(reportData, res) {
   // ── Draw footer on current page ──────────────────────────────
   function drawFooter() {
     doc.rect(0, PAGE_H - FOOTER_H, PAGE_W, FOOTER_H).fill(BRAND_PURPLE);
+    // Zero bottom margin so PDFKit doesn't auto-break before rendering near page bottom
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc.fillColor("#c4b5fd").fontSize(7.5).font("Helvetica")
-      .text("© PriceWise  —  Confidential", MARGIN, PAGE_H - 18);
+      .text("© PriceWise  —  Confidential", MARGIN, PAGE_H - 18, { lineBreak: false });
     doc.fillColor("#e0d7f8").fontSize(7.5)
-      .text(`Page ${pageNum}`, MARGIN, PAGE_H - 18, { align: "right", width: CONTENT_W });
+      .text(`Page ${pageNum}`, MARGIN, PAGE_H - 18, { align: "right", width: CONTENT_W, lineBreak: false });
+    doc.page.margins.bottom = savedBottom;
   }
 
   // ── Draw content page header ─────────────────────────────────
@@ -178,9 +182,13 @@ export function buildDailyReportPdf(reportData, res) {
         { align: "center", width: CONTENT_W - 160 });
   }
 
+  // Zero bottom margin so PDFKit doesn't auto-break before rendering near page bottom
+  const savedBottom = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
   doc.fillColor("#7c5dc7").fontSize(8).font("Helvetica")
     .text("© PriceWise  —  Confidential Pricing Report", MARGIN, PAGE_H - 44,
-      { align: "center", width: CONTENT_W });
+      { align: "center", width: CONTENT_W, lineBreak: false });
+  doc.page.margins.bottom = savedBottom;
 
   // ════════════════════════════════════════════════════════════
   // CONTENT PAGE 1

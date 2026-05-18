@@ -46,7 +46,7 @@ export default function Reports() {
       const data = await fetchDailyReport();
       return Array.isArray(data) ? data : [];
     },
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 60 , // 1 hour
   });
 
   const error = fetchError?.message || "";
