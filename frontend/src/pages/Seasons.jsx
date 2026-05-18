@@ -143,13 +143,13 @@ export default function Seasons() {
       const data = await fetchSeasons();
       return Array.isArray(data) ? data.map(normalize) : [];
     },
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules"],
     queryFn: () => fetchPricingRules().then((d) => (Array.isArray(d) ? d : [])),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   // Sort: Active → Upcoming → Passed, then by start date within each group

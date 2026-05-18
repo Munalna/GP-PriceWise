@@ -22,21 +22,21 @@ function Products() {
     queryKey: ["products", userId],
     queryFn: () => api.get("/products").then((r) => r.data),
     enabled: !!userId,
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   const { data: varComponents = [], isLoading: loadingVC } = useQuery({
     queryKey: ["varComponents", userId],
     queryFn: () => api.get("/products/var-components").then((r) => r.data),
     enabled: !!userId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60 , // 1 hour
   });
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules", userId],
     queryFn: () => api.get("/pricing-rules").then(r => r.data),
     enabled: !!userId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60 , // 1 hour
   });
 
   const loading = loadingCats || loadingVC;
@@ -446,25 +446,24 @@ const getComponentCostPerUnit = (name) => {
 const componentHelpText =
   "Select the ingredients used in ONE product recipe, then enter the amount used. Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.";
 
-  return (
-    <div style={pageContainer}>
-      <div style={headerStyle}>
-        <div>
-  <h1 style={mainTitle}>Products Management</h1>
-  <p style={subtitleStyle}>
-    Manage products, components, pricing rules, and smart recommendations.
-  </p>
-</div>
-        <button
-          style={btnMainAdd}
-          onClick={() => {
-            setModalError("");
-            setShowAddModal(true);
-          }}
-        >
-          + Add Product
-        </button>
-      </div>
+  return (<div style={pageContainer}>
+  <div style={headerStyle}>
+    <div>
+      <h1 style={mainTitle}>Products Management</h1>
+      <p style={{ margin: "6px 0 0", color: "#6b7280", fontSize: 14 }}>
+        Manage your products, components, pricing, and categories.
+      </p>
+    </div>
+    <button
+      style={btnMainAdd}
+      onClick={() => {
+        setModalError("");
+        setShowAddModal(true);
+      }}
+    >
+      + Add Product
+    </button>
+  </div>
 
       {error && (
         <Alert variant="danger" onClose={() => setError("")} dismissible>
@@ -1644,31 +1643,18 @@ const pageContainer = {
 /*
 
 const pageContainer = {
-
-  padding: "40px",
-
-  backgroundColor: "#f8f9fc",
-
-  minHeight: "100vh",
-
-};
-
-*/
-/*const pageContainer = {
-
   padding: "22px",
-
+  maxWidth: 1200,
   backgroundColor: "#f8f9fc",
-
   minHeight: "100vh",
-
-};  /** */
+};
 
 const headerStyle = {
   display: "flex",
   justifyContent: "space-between",
-  marginBottom: "30px",
-  alignItems: "center",
+  alignItems: "flex-start",
+  gap: 16,
+  marginBottom: 16,
 };
 
 const mainTitle = {
@@ -1692,7 +1678,6 @@ const btnMainAdd = {
   cursor: "pointer",
   fontWeight: "900",
   fontSize: "17px",
-  marginLeft: "100px",
 };
 
 const emptySimpleStyle = {

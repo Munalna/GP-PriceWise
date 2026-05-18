@@ -163,7 +163,7 @@ const normalize = (row) => ({
       const data = await getPricingRules();
       return Array.isArray(data) ? data.map(normalize) : [];
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60 , // 1 hour
   });
 
   const error =
@@ -551,7 +551,7 @@ function PricingRuleModal({ initial, onClose, onSave }) {
 }
 
 const styles = {
-  page: { padding: 22, maxWidth: 1100 },
+  page: { padding: 22 },
   headerRow: {
     display: "flex",
     justifyContent: "space-between",

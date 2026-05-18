@@ -32,13 +32,13 @@ useEffect(() => {
   const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
     queryKey: ["fixedCosts"],
     queryFn: fetchFixedCosts,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   const { data: components = [], isLoading: loadingVars } = useQuery({
     queryKey: ["varComponents"],
     queryFn: fetchVariableComponents,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 60 , //1 hour
   });
 
   const loading = loadingFixed || loadingVars;
