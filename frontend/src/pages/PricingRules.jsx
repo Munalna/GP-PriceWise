@@ -281,7 +281,7 @@ export default function PricingRules() {
                           ? new Date(rule.createdAt).toLocaleDateString()
                           : "-"}
                       </td>
-                      <td style={{ ...styles.td, textAlign: "center" }}>
+                     <td style={{ ...styles.td, textAlign: "center", width: 150 }}>
                         <div style={styles.actions}>
                            <button
   style={styles.iconBtn}
@@ -292,7 +292,7 @@ export default function PricingRules() {
 </button>
 
 <button
-  style={{ ...styles.iconBtn, background: "#e13421",}}
+  style={{ ...styles.iconBtn, background: "#e13421", }}
   onClick={() => onDelete(rule.id)}
   type="button"
 >
@@ -528,10 +528,17 @@ const styles = {
     fontStyle: "italic",
   },
 actions: {
+
   display: "flex",
+
   justifyContent: "center",
-  gap: 10,
+
   alignItems: "center",
+
+  gap: 10,
+
+  width: "100%",
+
 },
 
 iconBtn: {

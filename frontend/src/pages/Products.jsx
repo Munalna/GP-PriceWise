@@ -1588,16 +1588,22 @@ const actionGroup = {
 const actionBtnBase = {
   border: "none",
   color: "white",
-  width: "32px",
-  height: "32px",
-  borderRadius: "7px",
+  width: "38px",
+  height: "38px",
+  minWidth: "38px",
+  maxWidth: "38px",
+  minHeight: "38px",
+  maxHeight: "38px",
+  borderRadius: "8px",
   cursor: "pointer",
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   fontSize: "14px",
   padding: 0,
   lineHeight: 1,
+  boxSizing: "border-box",
+  flex: "0 0 38px",
 };
 
 const actionBtnPurple = {
