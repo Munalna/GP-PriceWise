@@ -7,6 +7,7 @@ import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyt
 import { ChartColumnDecreasing } from "lucide-react";
 import { CiLink, CiEdit } from "react-icons/ci";
 import { FaRegTrashAlt } from "react-icons/fa";
+import { RiAlertLine } from "react-icons/ri";
 
 const API_URL = "/api/products";
 function Products() {
@@ -60,6 +61,8 @@ function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
+ const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [feedback, setFeedback] = useState({
   type: "",
   message: "",
@@ -371,13 +374,18 @@ const handleRenameCategory = async (cat) => {
   }
 };
 
-const handleDeleteCategory = async (cat) => {
-  if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+const handleDeleteCategory = async () => {
+  if (!categoryToDelete) return;
+
+  const cat = categoryToDelete;
 
   setFeedback({ type: "", message: "", location: "" });
 
   try {
     await api.delete(`/products/categories/${cat.id}`);
+
+    setShowCategoryDeleteConfirm(false);
+    setCategoryToDelete(null);
 
     showFeedback("success", "Category deleted successfully.", `category-${cat.id}`);
 
@@ -385,6 +393,7 @@ const handleDeleteCategory = async (cat) => {
       await invalidate();
     }, 1200);
   } catch (err) {
+    setShowCategoryDeleteConfirm(false);
     showFeedback(
       "danger",
       err.response?.data?.error || err.message || "Error deleting category.",
@@ -466,17 +475,14 @@ const componentHelpText =
   style={categoryDeleteBtn}
   disabled={cat.is_virtual}
   onClick={() => {
-    if (!cat.is_virtual) handleDeleteCategory(cat);
+    if (!cat.is_virtual) {
+      setCategoryToDelete(cat);
+      setShowCategoryDeleteConfirm(true);
+    }
   }}
   title="Delete Category"
 >
-  <FaRegTrashAlt
-
-  size={14}
-
-  style={{ transform: "translateY(-2px)" }}
-
-/>
+  <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
 </button>
       </div>
 
@@ -825,7 +831,21 @@ const componentHelpText =
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: "40px", marginBottom: "10px" }}>⚠️</div>
+           <div
+  style={{
+    width: "70px",
+    height: "70px",
+    borderRadius: "50%",
+    background: "#fff4e5",
+    color: "#f59e0b",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 16px",
+  }}
+>
+  <RiAlertLine size={38} />
+</div>
             <h3
               style={{
                 ...modalTitleCustom,
@@ -866,6 +886,116 @@ const componentHelpText =
           </div>
         </div>
       )}
+
+ {showCategoryDeleteConfirm && categoryToDelete && (
+
+        <div style={modalOverlay}>
+
+          <div
+
+            style={{
+
+              ...modalContentCustom,
+
+              width: "350px",
+
+              textAlign: "center",
+
+            }}
+
+          >
+
+            <div
+
+              style={{
+
+                width: "70px",
+
+                height: "70px",
+
+                borderRadius: "50%",
+
+                background: "#fff4e5",
+
+                color: "#f59e0b",
+
+                display: "flex",
+
+                alignItems: "center",
+
+                justifyContent: "center",
+
+                margin: "0 auto 16px",
+
+              }}
+
+            >
+
+              <RiAlertLine size={38} />
+
+            </div>
+
+            <h3 style={{ ...modalTitleCustom, fontSize: "20px", marginBottom: "10px" }}>
+
+              Delete category?
+
+            </h3>
+
+            <p style={{ color: "#666", fontSize: "14px", marginBottom: "25px" }}>
+
+              This action cannot be undone. Category "{categoryToDelete.name}" will be permanently removed.
+
+            </p>
+
+            <div style={{ ...modalFooterCustom, justifyContent: "center" }}>
+
+              <button
+
+                style={{ ...btnCancelCustom, padding: "10px 20px" }}
+
+                onClick={() => {
+
+                  setShowCategoryDeleteConfirm(false);
+
+                  setCategoryToDelete(null);
+
+                }}
+
+              >
+
+                Cancel
+
+              </button>
+
+              <button
+
+                style={{
+
+                  ...btnSaveCustom,
+
+                  backgroundColor: "#e13421",
+
+                  padding: "10px 20px",
+
+                }}
+
+                onClick={handleDeleteCategory}
+
+              >
+
+                Delete
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
 
       {showAddModal && (
         <div style={modalOverlay}>
