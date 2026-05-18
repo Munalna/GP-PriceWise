@@ -10,6 +10,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
+const Home         = lazy(() => import('./pages/Home'));
 const Products     = lazy(() => import('./pages/Products'));
 const Costs        = lazy(() => import('./pages/Costs'));
 const Seasons      = lazy(() => import('./pages/Seasons'));
@@ -52,6 +53,7 @@ function App() {
           {/* Protected routes */}
           {[
             { path: '/dashboard',     Page: Dashboard },
+            { path: '/home',          Page: Home },
             { path: '/products',      Page: Products },
             { path: '/costs',         Page: Costs },
             { path: '/seasons',       Page: Seasons },

@@ -25,16 +25,18 @@ const Sidebar = () => {
       setUserName(name);
       setUserInitials(name.charAt(0).toUpperCase());
     };
+
     getUser();
   }, []);
 
   const menuItems = [
-    { path: '/dashboard',     icon: 'bi-speedometer2',       label: 'Dashboard' },
-    { path: '/products',      icon: 'bi-box-seam',           label: 'Products' },
-    { path: '/costs',         icon: 'bi-currency-dollar',    label: 'Cost Management' },
-    { path: '/seasons',       icon: 'bi-calendar-event',     label: 'Seasons' },
-    { path: '/pricing-rules', icon: 'bi-sliders',            label: 'Pricing Rules' },
-    { path: '/reports',       icon: 'bi-file-earmark-text',  label: 'Reports' },
+    { path: '/home',          icon: 'bi-house-door',      label: 'Home' },
+    { path: '/dashboard',     icon: 'bi-speedometer2',    label: 'Dashboard' },
+    { path: '/products',      icon: 'bi-box-seam',        label: 'Products' },
+    { path: '/costs',         icon: 'bi-currency-dollar', label: 'Cost Management' },
+    { path: '/seasons',       icon: 'bi-calendar-event',  label: 'Seasons' },
+    { path: '/pricing-rules', icon: 'bi-sliders',         label: 'Pricing Rules' },
+    { path: '/reports',       icon: 'bi-file-earmark-text', label: 'Reports' },
   ];
 
   const handleLogout = async () => {
@@ -46,13 +48,16 @@ const Sidebar = () => {
   return (
     <>
       <div className="sidebar-container">
-
-        {/* Logo */}
         <div className="sidebar-header">
-          <div className="sidebar-logo-row">
+          <div
+            className="sidebar-logo-row"
+            onClick={() => navigate('/home')}
+            style={{ cursor: 'pointer' }}
+          >
             <div className="sidebar-logo-icon">
               <i className="bi bi-layers-fill"></i>
             </div>
+
             <div>
               <h1 className="sidebar-brand">PriceWise</h1>
               <p className="sidebar-tagline">Smart Pricing</p>
@@ -60,7 +65,6 @@ const Sidebar = () => {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {menuItems.map((item) => (
             <NavLink
@@ -76,14 +80,15 @@ const Sidebar = () => {
           ))}
         </nav>
 
-        {/* User Footer */}
         <div className="sidebar-footer">
           <div className="sidebar-user-row">
             <div className="sidebar-avatar">{userInitials}</div>
+
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{userName || 'User'}</div>
               <div className="sidebar-user-role">Admin</div>
             </div>
+
             <button
               className="sidebar-logout-btn"
               title="Logout"
@@ -95,20 +100,22 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Logout Modal */}
       <Modal show={showLogoutModal} onHide={() => setShowLogoutModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title className="fw-bold">Confirm Logout</Modal.Title>
         </Modal.Header>
+
         <Modal.Body>
           <p className="mb-0">
             Are you sure you want to logout from <strong>PriceWise</strong>?
           </p>
         </Modal.Body>
+
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowLogoutModal(false)}>
             Cancel
           </Button>
+
           <Button variant="danger" onClick={handleLogout}>
             Logout
           </Button>
