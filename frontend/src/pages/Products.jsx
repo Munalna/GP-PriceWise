@@ -1446,7 +1446,8 @@ const btnMainAdd = {
   padding: "12px 24px",
   borderRadius: "10px",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "900",
+  fontSize: "17px",
   marginLeft: "100px",
 };
 
@@ -1478,7 +1479,8 @@ const categoryHeader = {
 
 const catTitleText = {
   fontSize: "22px",
-  color: "#5b2d89",
+  color: "#382372",
+  fontWeight: "900",
   margin: 0,
 };
 
