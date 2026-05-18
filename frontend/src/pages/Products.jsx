@@ -18,19 +18,19 @@ function Products() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
-  const { data: categories = [], isLoading: loadingCats } = useQuery({
-    queryKey: ["products", userId],
-    queryFn: () => api.get("/products").then((r) => r.data),
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 60, // 1 hour
-  });
+const { data: categories = [], isLoading: loadingCats } = useQuery({
+  queryKey: ["products", userId],
+  queryFn: () => api.get("/products").then((r) => Array.isArray(r.data) ? r.data : []),
+  enabled: !!userId,
+  staleTime: 1000 * 60 * 60,
+});
 
-  const { data: varComponents = [], isLoading: loadingVC } = useQuery({
-    queryKey: ["varComponents", userId],
-    queryFn: () => api.get("/products/var-components").then((r) => r.data),
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 60 , // 1 hour
-  });
+const { data: varComponents = [], isLoading: loadingVC } = useQuery({
+  queryKey: ["varComponents", userId],
+  queryFn: () => api.get("/products/var-components").then((r) => Array.isArray(r.data) ? r.data : []),
+  enabled: !!userId,
+  staleTime: 1000 * 60 * 60,
+});
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules", userId],
