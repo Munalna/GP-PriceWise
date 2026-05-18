@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChartColumnDecreasing } from "lucide-react";
+import { CiLink, CiEdit } from "react-icons/ci";
+import { FaRegTrashAlt } from "react-icons/fa";
 import {
   getPricingRules,
   createPricingRule,
@@ -280,20 +283,21 @@ export default function PricingRules() {
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
-                          <button
-                            style={styles.iconBtn}
-                            onClick={() => openEdit(rule)}
-                            type="button"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            style={{ ...styles.iconBtn, background: "#ef4444" }}
-                            onClick={() => onDelete(rule.id)}
-                            type="button"
-                          >
-                            🗑️
-                          </button>
+                           <button
+  style={styles.iconBtn}
+  onClick={() => openEdit(rule)}
+  type="button"
+>
+  <CiEdit size={18} strokeWidth={0.8} />
+</button>
+
+<button
+  style={{ ...styles.iconBtn, background: "#e13421",}}
+  onClick={() => onDelete(rule.id)}
+  type="button"
+>
+  <FaRegTrashAlt size={13} />
+</button>
                         </div>
                       </td>
                     </tr>
@@ -523,17 +527,30 @@ const styles = {
     color: "#6b7280",
     fontStyle: "italic",
   },
+actions: {
+  display: "flex",
+  justifyContent: "center",
+  gap: 10,
+  alignItems: "center",
+},
 
-  actions: { display: "flex", justifyContent: "center", gap: 10 },
-  iconBtn: {
-    border: "none",
-    background: "#f59e0b",
-    color: "#fff",
-    borderRadius: 10,
-    padding: "10px 12px",
-    cursor: "pointer",
-    fontWeight: 900,
-  },
+iconBtn: {
+  width: 38,
+  height: 38,
+  minWidth: 38,
+  minHeight: 38,
+  border: "none",
+  background: "#f59e0b",
+  color: "#fff",
+  borderRadius: 8,
+  padding: 0,
+  cursor: "pointer",
+  fontWeight: 900,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+},
 
   primaryBtn: {
     background: "#382372",

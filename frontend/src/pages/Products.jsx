@@ -4,6 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyticsService";
+import { ChartColumnDecreasing } from "lucide-react";
+import { CiLink, CiEdit } from "react-icons/ci";
+import { FaRegTrashAlt } from "react-icons/fa";
 
 const API_URL = "/api/products";
 function Products() {
@@ -448,27 +451,33 @@ const componentHelpText =
       <div style={categoryTitleRow}>
         <h2 style={catTitleText}>{cat.name}</h2>
 
-        <button
-          style={categoryEditBtn}
-          disabled={cat.is_virtual}
-          onClick={() => {
-            if (!cat.is_virtual) handleRenameCategory(cat);
-          }}
-          title="Rename Category"
-        >
-          ✏️
-        </button>
+     <button
+  style={categoryEditBtn}
+  disabled={cat.is_virtual}
+  onClick={() => {
+    if (!cat.is_virtual) handleRenameCategory(cat);
+  }}
+  title="Rename Category"
+>
+  <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
+</button>
 
-        <button
-          style={categoryDeleteBtn}
-          disabled={cat.is_virtual}
-          onClick={() => {
-            if (!cat.is_virtual) handleDeleteCategory(cat);
-          }}
-          title="Delete Category"
-        >
-          🗑️
-        </button>
+<button
+  style={categoryDeleteBtn}
+  disabled={cat.is_virtual}
+  onClick={() => {
+    if (!cat.is_virtual) handleDeleteCategory(cat);
+  }}
+  title="Delete Category"
+>
+  <FaRegTrashAlt
+
+  size={14}
+
+  style={{ transform: "translateY(-2px)" }}
+
+/>
+</button>
       </div>
 
       <div style={badgeRow}>
@@ -480,19 +489,20 @@ const componentHelpText =
       </div>
     </div>
 
-                  <button
-                    style={btnAssignRules}
-                    disabled={cat.is_virtual}
-                    onClick={() => {
-                      if (cat.is_virtual) return;
-                      setSelectedCategory(cat);
-                      setSelectedProduct(null);
-                      setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
-                      setShowRulesModal(true);
-                    }}
-                  >
-                    🔗 Assign Rules
-                  </button>
+                 <button
+  style={btnAssignRules}
+  disabled={cat.is_virtual}
+  onClick={() => {
+    if (cat.is_virtual) return;
+    setSelectedCategory(cat);
+    setSelectedProduct(null);
+    setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
+    setShowRulesModal(true);
+  }}
+>
+  <CiLink size={20} strokeWidth={0.8} style={{ marginRight: "6px" }} />
+  Assign Rules
+</button>
                 </div>
 
  {feedback.location === `category-${cat.id}` && (
@@ -621,59 +631,62 @@ const componentHelpText =
 )}
                             </td>
 
-                            <td style={tdStyle}>
-                              <div style={actionGroup}>
-                                <button
-                                  style={actionBtnPurple}
-                                  disabled={riskLoading}
-                                  title="Analyze Pricing"
-                                  onClick={() => handleAnalyzePricing(prod.id)}
-                                >
-                                  📊
-                                </button>
+                        <td style={tdStyle}>
+  <div style={actionGroup}>
+    <button
+  style={actionBtnPurple}
+  disabled={riskLoading}
+  title="Analyze Pricing"
+  onClick={() => handleAnalyzePricing(prod.id)}
+>
+  <ChartColumnDecreasing size={16} />
+</button>
 
-                                <button
-                                  style={actionBtnBlue}
-                                  onClick={() => {
-                                    setSelectedProduct({
-                                      ...prod,
-                                      components: comps,
-                                    });
-                                    setSelectedCategory(null);
-                                    setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
-                                    setShowRulesModal(true);
-                                  }}
-                                >
-                                  🔗
-                                </button>
+    <button
+      style={actionBtnBlue}
+      title="Assign Rules"
+      onClick={() => {
+        setSelectedProduct({
+          ...prod,
+          components: comps,
+        });
+        setSelectedCategory(null);
+        setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
+        setShowRulesModal(true);
+      }}
+    >
+      <CiLink size={18} strokeWidth={0.8} />
+    </button>
 
-                                <button
-                                  style={actionBtnOrange}
-                                  onClick={() => {
-                                    setSelectedProduct({
-                                      ...prod,
-                                      components: comps,
-                                    });
-                                    setModalError("");
-                                    setEditCatName("");
-                                    setShowEditCategoryInput(false);
-                                    setShowEditModal(true);
-                                  }}
-                                >
-                                  ✏️
-                                </button>
+    <button
+      style={actionBtnOrange}
+      title="Edit Product"
+      onClick={() => {
+        setSelectedProduct({
+          ...prod,
+          components: comps,
+        });
+        setModalError("");
+        setEditCatName("");
+        setShowEditCategoryInput(false);
+        setShowEditModal(true);
+      }}
+    >
+      <CiEdit size={18} strokeWidth={0.8} />
+    </button>
 
-                                <button
-                                  style={actionBtnRed}
-                                  onClick={() => {
-                                    setProductIdToDelete(prod.id);
-                                    setShowDeleteConfirm(true);
-                                  }}
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
+    <button
+      style={actionBtnRed}
+      title="Delete Product"
+      onClick={() => {
+        setProductIdToDelete(prod.id);
+        setShowDeleteConfirm(true);
+      }}
+    >
+      <FaRegTrashAlt size={13} />
+    </button>
+  </div>
+</td>
                           </tr>
                         );
                       })}
@@ -1392,10 +1405,20 @@ const componentHelpText =
 
 
 const pageContainer = {
-  padding: "40px",
+padding: "40px",
   backgroundColor: "#f8f9fc",
   minHeight: "100vh",
 };
+
+/*const pageContainer = {
+
+  padding: "22px",
+
+  backgroundColor: "#f8f9fc",
+
+  minHeight: "100vh",
+
+};  /** */
 
 const headerStyle = {
   display: "flex",
@@ -1405,14 +1428,19 @@ const headerStyle = {
 };
 
 const mainTitle = {
-  fontSize: "32px",
-  color: "#2d1b4e",
-  fontWeight: "700",
+
+  fontSize: "34px",
+
+  color: "#111827",
+
+  fontWeight: "900",
+
   margin: 0,
+
 };
 
 const btnMainAdd = {
-  backgroundColor: "#2d1b4e",
+  backgroundColor: "#382372",
   color: "white",
   border: "none",
   padding: "12px 24px",
@@ -1455,7 +1483,7 @@ const catTitleText = {
 };
 
 const btnAssignRules = {
-  backgroundColor: "#3498db",
+  backgroundColor: "#1273b4",
   color: "white",
   border: "none",
   padding: "8px 18px",
@@ -1497,7 +1525,7 @@ const badgeRow = {
 };
 
 const orangeBadgeSmall = {
-  backgroundColor: "#3498db",
+  backgroundColor: "#1273b4",
   color: "white",
   fontSize: "10px",
   padding: "3px 8px",
@@ -1506,7 +1534,7 @@ const orangeBadgeSmall = {
 };
 
 const blueBadgeSmall = {
-  backgroundColor: "#3498db",
+  backgroundColor: "#1273b4",
   color: "white",
   fontSize: "10px",
   padding: "3px 8px",
@@ -1553,7 +1581,8 @@ const prodNameText = {
 
 const actionGroup = {
   display: "flex",
-  gap: "8px",
+  gap: "10px",
+  alignItems: "center",
 };
 
 const actionBtnBase = {
@@ -1561,11 +1590,14 @@ const actionBtnBase = {
   color: "white",
   width: "32px",
   height: "32px",
-  borderRadius: "6px",
+  borderRadius: "7px",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+  fontSize: "14px",
+  padding: 0,
+  lineHeight: 1,
 };
 
 const actionBtnPurple = {
@@ -1575,17 +1607,17 @@ const actionBtnPurple = {
 
 const actionBtnBlue = {
   ...actionBtnBase,
-  backgroundColor: "#3498db",
+  backgroundColor: "#1273b4",
 };
 
 const actionBtnOrange = {
   ...actionBtnBase,
-  backgroundColor: "#ffb74d",
+  backgroundColor: "#f59e0b",
 };
 
 const actionBtnRed = {
   ...actionBtnBase,
-  backgroundColor: "#e74c3c",
+  backgroundColor: "#e13421",
 };
 
 const modalOverlay = {
@@ -1607,17 +1639,22 @@ const categoryTitleRow = {
 
 const categoryEditBtn = {
   border: "none",
-  backgroundColor: "#ffb74d",
+  backgroundColor: "#f59e0b",
   color: "white",
   width: "30px",
   height: "30px",
   borderRadius: "6px",
   cursor: "pointer",
+  padding: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
 };
 
 const categoryDeleteBtn = {
   border: "none",
-  backgroundColor: "#e74c3c",
+  backgroundColor: "#e13421",
   color: "white",
   width: "30px",
   height: "30px",

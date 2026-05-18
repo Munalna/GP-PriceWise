@@ -9,6 +9,8 @@ import {
   assignSeasonRules,
 } from "../services/seasonService";
 import ConfirmModal from "../components/cost/ConfirmModal";
+import { CiLink, CiEdit } from "react-icons/ci";
+import { FaRegTrashAlt } from "react-icons/fa";
 
 const normalize = (row) => ({
   id: row?.id,
@@ -330,44 +332,39 @@ export default function Seasons() {
                           </span>
                         </td>
 
-                        <td style={{ ...styles.td, textAlign: "center" }}>
-                          <div style={styles.actions}>
-                            {!isPassed && (
-                              <button
-                                style={{
-                                  ...styles.iconBtn,
-                                  background: "#382372",
-                                }}
-                                onClick={() => openRulesModal(season)}
-                                type="button"
-                                title="Assign Rules"
-                              >
-                                🔗
-                              </button>
-                            )}
+                       <td style={{ ...styles.td, textAlign: "center" }}>
+  <div style={styles.actions}>
+    {!isPassed && (
+      <button
+        style={{ ...styles.iconBtn, background: "#382372" }}
+        // style={{ ...styles.iconBtn, background: "#1273b4" }}
+        onClick={() => openRulesModal(season)}
+        type="button"
+        title="Assign Rules"
+      >
+        <CiLink size={18} strokeWidth={0.8} />
+      </button>
+    )}
 
-                            <button
-                              style={styles.iconBtn}
-                              onClick={() => openEdit(season)}
-                              type="button"
-                              title="Edit Season"
-                            >
-                              ✏️
-                            </button>
+    <button
+      style={styles.iconBtn}
+      onClick={() => openEdit(season)}
+      type="button"
+      title="Edit Season"
+    >
+      <CiEdit size={18} strokeWidth={0.8} />
+    </button>
 
-                            <button
-                              style={{
-                                ...styles.iconBtn,
-                                background: "#ef4444",
-                              }}
-                              onClick={() => setDeleteTarget(season)}
-                              type="button"
-                              title="Delete Season"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
+    <button
+      style={{ ...styles.iconBtn, background: "#e13421", }}
+      onClick={() => setDeleteTarget(season)}
+      type="button"
+      title="Delete Season"
+    >
+      <FaRegTrashAlt size={13} />
+    </button>
+  </div>
+</td>
                       </tr>
                     );
                   })
@@ -670,16 +667,34 @@ const styles = {
     fontStyle: "italic",
   },
 
-  actions: { display: "flex", justifyContent: "center", gap: 10 },
-  iconBtn: {
-    border: "none",
-    background: "#f59e0b",
-    color: "#fff",
-    borderRadius: 10,
-    padding: "10px 12px",
-    cursor: "pointer",
-    fontWeight: 900,
-  },
+ actions: {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: 10,
+},
+
+iconBtn: {
+  width: 38,
+  height: 38,
+  minWidth: 38,
+  maxWidth: 38,
+  minHeight: 38,
+  maxHeight: 38,
+  border: "none",
+  background: "#f59e0b",
+  color: "#fff",
+  borderRadius: 8,
+  padding: 0,
+  cursor: "pointer",
+  fontWeight: 900,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  lineHeight: 1,
+  flex: "0 0 38px",
+},
 
   primaryBtn: {
     background: "#382372",
