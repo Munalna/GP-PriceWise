@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Card, Button, Table, Badge } from "react-bootstrap";
+import { CiEdit } from "react-icons/ci";
+import { FaRegTrashAlt } from "react-icons/fa";
 import FixedCostModal from "./FixedCostModal";
 import ConfirmModal from "./ConfirmModal";
 
@@ -23,60 +24,84 @@ const FixedCostsSection = ({ items, onAdd, onEdit, onDelete }) => {
   }, [items]);
 
   return (
-    <Card className="mb-4 shadow-sm">
-      <Card.Header className="d-flex align-items-center justify-content-between">
+    <div style={styles.card}>
+      <div style={styles.cardHeader}>
         <div>
-          <h5 className="mb-0 fw-bold">Fixed Costs</h5>
-          <small className="text-muted">Total (normalized monthly):</small>{" "}
-          <Badge bg="secondary">{monthlyTotal.toFixed(2)} SAR</Badge>
+          <h3 style={styles.sectionTitle}>Fixed Costs</h3>
+          <div style={styles.metaRow}>
+            <span>Total monthly:</span>
+            <span style={styles.badge}>{monthlyTotal.toFixed(2)} SAR</span>
+          </div>
         </div>
-        <Button onClick={() => { setEditing(null); setShowModal(true); }}>
-          + Add Fixed Cost
-        </Button>
-      </Card.Header>
 
-      <Card.Body>
-        <Table responsive hover className="mb-0">
-          <thead className="table-light">
+        <button
+          style={styles.primaryBtn}
+          onClick={() => {
+            setEditing(null);
+            setShowModal(true);
+          }}
+          type="button"
+        >
+          + Add Fixed Cost
+        </button>
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={styles.table}>
+          <thead>
             <tr>
-              <th>Name</th>
-              <th>Amount (SAR)</th>
-              <th>Period</th>
-              <th style={{ width: 180 }}>Actions</th>
+              <th style={styles.th}>Name</th>
+              <th style={styles.th}>Amount</th>
+              <th style={styles.th}>Period</th>
+              <th style={{ ...styles.th, textAlign: "center", width: 150 }}>
+                Actions
+              </th>
             </tr>
           </thead>
+
           <tbody>
             {(items || []).length === 0 ? (
-              <tr><td colSpan="4" className="text-center text-muted py-4">No fixed costs added yet.</td></tr>
+              <tr>
+                <td colSpan={4} style={styles.emptyCell}>
+                  No fixed costs added yet.
+                </td>
+              </tr>
             ) : (
               items.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{Number(c.amount).toFixed(2)}</td>
-                  <td>{c.period}</td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="outline-danger"
-                      className="me-2"
-                      onClick={() => setDeleting(c)}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      onClick={() => { setEditing(c); setShowModal(true); }}
-                    >
-                      Edit
-                    </Button>
+                  <td style={styles.tdName}>{c.name}</td>
+                  <td style={styles.td}>{Number(c.amount).toFixed(2)} SAR</td>
+                  <td style={styles.td}>{c.period}</td>
+                  <td style={{ ...styles.td, textAlign: "center", width: 150 }}>
+                    <div style={styles.actions}>
+                      <button
+                        style={styles.iconBtn}
+                        onClick={() => {
+                          setEditing(c);
+                          setShowModal(true);
+                        }}
+                        type="button"
+                        title="Edit"
+                      >
+                        <CiEdit size={18} strokeWidth={0.8} />
+                      </button>
+
+                      <button
+                        style={{ ...styles.iconBtn, background: "#e13421" }}
+                        onClick={() => setDeleting(c)}
+                        type="button"
+                        title="Delete"
+                      >
+                        <FaRegTrashAlt size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
-        </Table>
-      </Card.Body>
+        </table>
+      </div>
 
       <FixedCostModal
         show={showModal}
@@ -99,8 +124,115 @@ const FixedCostsSection = ({ items, onAdd, onEdit, onDelete }) => {
           setDeleting(null);
         }}
       />
-    </Card>
+    </div>
   );
+};
+
+const styles = {
+  card: {
+    background: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+    border: "1px solid #eef2f7",
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 900,
+    color: "#111827",
+  },
+  metaRow: {
+    marginTop: 6,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    color: "#6b7280",
+    fontSize: 13,
+  },
+  badge: {
+    background: "#ede9fe",
+    color: "#382372",
+    padding: "5px 9px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  primaryBtn: {
+    background: "#382372",
+    border: "none",
+    color: "#fff",
+    borderRadius: 12,
+    padding: "10px 14px",
+    cursor: "pointer",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "separate",
+    borderSpacing: 0,
+  },
+  th: {
+    textAlign: "left",
+    padding: "12px",
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: 900,
+    borderBottom: "1px solid #eef2f7",
+  },
+  td: {
+    padding: "14px 12px",
+    fontSize: 14,
+    color: "#111827",
+    borderBottom: "1px solid #eef2f7",
+    verticalAlign: "middle",
+  },
+  tdName: {
+    padding: "14px 12px",
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: 800,
+    borderBottom: "1px solid #eef2f7",
+    verticalAlign: "middle",
+  },
+  emptyCell: {
+    padding: 18,
+    textAlign: "center",
+    color: "#6b7280",
+    fontStyle: "italic",
+  },
+  actions: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    border: "none",
+    background: "#f59e0b",
+    color: "#fff",
+    borderRadius: 8,
+    padding: 0,
+    cursor: "pointer",
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+  },
 };
 
 export default FixedCostsSection;
