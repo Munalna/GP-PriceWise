@@ -130,20 +130,35 @@ const showCategoryFeedback = (type, message) => {
     try { return JSON.parse(compData); } catch (e) { return []; }
   };
 
-  const handleAnalyzePricing = async (productId) => {
-    setRiskLoading(true);
-    setError("");
-    try {
-      const result = await getAIPriceRecommendation(productId);
-      setRiskResult(result.data);
-      setShowRiskModal(true);
-      if (result.data?.ai?.recommended_price) {
-        setAiRecommendedPrices((prev) => ({ ...prev, [productId]: result.data.ai.recommended_price }));
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to analyze product pricing.");
-    } finally { setRiskLoading(false); }
-  };
+ const handleAnalyzePricing = async (productId) => {
+  setRiskLoading(true);
+  setRiskResult(null);
+  setError("");
+  setShowRiskModal(true);
+
+  try {
+    const result = await getAIPriceRecommendation(productId);
+
+    setRiskResult(result.data);
+
+    if (result.data?.ai?.recommended_price) {
+      setAiRecommendedPrices((prev) => ({
+        ...prev,
+        [productId]: result.data.ai.recommended_price,
+      }));
+    }
+  } catch (err) {
+    setError(
+      err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to analyze product pricing."
+    );
+    setShowRiskModal(false);
+  } finally {
+    setRiskLoading(false);
+  }
+};
 
   const toggleComponent = (name, isEdit = false) => {
     const target = isEdit ? selectedProduct : newProd;
@@ -719,118 +734,117 @@ const componentHelpText =
           )}
         </>
       )}
+{showRiskModal && (
+  <div style={modalOverlay}>
+    <div style={riskModalContent}>
+      <h2 style={modalTitleCustom}>Pricing Risk Analysis</h2>
 
-      {showRiskModal && riskResult && (
-        <div style={modalOverlay}>
-          <div style={riskModalContent}>
-            <h2 style={modalTitleCustom}>Pricing Risk Analysis</h2>
-
-            <div style={riskHeaderBox}>
-              <h3 style={riskProductName}>{riskResult.product.name}</h3>
-              <span style={riskScoreBadge}>
-                Risk Score: {riskResult.analysis.risk_score}
-              </span>
-            </div>
-
-            {riskResult.ai && (
-  <div style={recommendedBox}>
-    <strong>AI Recommended Price</strong>
-    <h2>{riskResult.ai.recommended_price} SAR</h2>
-    <p>{riskResult.ai.reason}</p>
-  </div>
-)}
-
-            <div style={riskGrid}>
-              <div style={riskCard}>
-                <strong>Pricing Health</strong>
-                <p>{riskResult.analysis.pricing_health}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Risk Label</strong>
-                <p>{riskResult.analysis.risk_label}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Market Comparison</strong>
-                <p>{riskResult.analysis.market_comparison}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Profit Impact</strong>
-                <p>{riskResult.analysis.profit_impact}</p>
-              </div>
-            </div>
-
-            <div style={riskDetailsBox}>
-              <p>
-                <strong>Current Price:</strong>{" "}
-                {riskResult.product.current_price} SAR
-              </p>
-              <p>
-                <strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR
-              </p>
-              <p>
-                <strong>Component Cost:</strong>{" "}
-                {riskResult.cost.component_cost} SAR
-              </p>
-              <p>
-                <strong>Competitor Average:</strong>{" "}
-                {riskResult.market.competitor_average_price} SAR
-              </p>
-              <p>
-                <strong>Applied Margin:</strong>{" "}
-                {riskResult.analysis.applied_margin}%
-              </p>
-              <p>
-                <strong>Profit Per Unit:</strong>{" "}
-                {riskResult.analysis.profit_per_unit} SAR
-              </p>
-            </div>
-
-            <div style={insightBox}>
-              <strong>Pricing Insight</strong>
-              <p>{riskResult.analysis.pricing_insight}</p>
-            </div>
-
-            {riskResult.ai ? (
-  <>
-    <div style={insightBox}>
-      <strong>AI Risk Explanation</strong>
-      <p>{riskResult.ai.risk_explanation}</p>
-    </div>
-
-    <div style={insightBox}>
-      <strong>AI Margin Safety</strong>
-      <p>{riskResult.ai.margin_safety_explanation}</p>
-    </div>
-
-    <div style={insightBox}>
-      <strong>AI Recommended Action</strong>
-      <p>{riskResult.ai.action}</p>
-    </div>
-  </>
-) : (
-  <div style={insightBox}>
-    <strong>Recommendation</strong>
-    <p>{riskResult.analysis.recommendation}</p>
-  </div>
-)}
-
-            <div style={modalFooterCustom}>
-              <button
-                style={btnCancelCustom}
-                onClick={() => {
-                  setShowRiskModal(false);
-                  setRiskResult(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
+      {riskLoading && (
+        <div style={riskLoadingBox}>
+          <Spinner animation="border" size="sm" variant="primary" />
+          <div>
+            <strong>Analyzing pricing risk...</strong>
+            <p style={{ margin: 0 }}>
+              PriceWise is calculating costs, rules, market position, and AI recommendation.
+            </p>
           </div>
         </div>
       )}
+
+      {!riskLoading && riskResult && (
+        <>
+          <div style={riskHeaderBox}>
+            <h3 style={riskProductName}>{riskResult.product.name}</h3>
+            <span style={riskScoreBadge}>
+              Risk Score: {riskResult.analysis.risk_score}
+            </span>
+          </div>
+
+          {riskResult.ai && (
+            <div style={recommendedBox}>
+              <strong>AI Recommended Price</strong>
+              <h2>{riskResult.ai.recommended_price} SAR</h2>
+              <p>{riskResult.ai.reason}</p>
+            </div>
+          )}
+
+          <div style={riskGrid}>
+            <div style={riskCard}>
+              <strong>Pricing Health</strong>
+              <p>{riskResult.analysis.pricing_health}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Risk Label</strong>
+              <p>{riskResult.analysis.risk_label}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Market Comparison</strong>
+              <p>{riskResult.analysis.market_comparison}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Profit Impact</strong>
+              <p>{riskResult.analysis.profit_impact}</p>
+            </div>
+          </div>
+
+          <div style={riskDetailsBox}>
+            <p><strong>Current Price:</strong> {riskResult.product.current_price} SAR</p>
+            <p><strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR</p>
+            <p><strong>Component Cost:</strong> {riskResult.cost.component_cost} SAR</p>
+            <p><strong>Competitor Average:</strong> {riskResult.market.competitor_average_price} SAR</p>
+            <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
+            <p><strong>Profit Per Unit:</strong> {riskResult.analysis.profit_per_unit} SAR</p>
+          </div>
+
+          <div style={insightBox}>
+            <strong>Pricing Insight</strong>
+            <p>{riskResult.analysis.pricing_insight}</p>
+          </div>
+
+          {riskResult.ai ? (
+            <>
+              <div style={insightBox}>
+                <strong>AI Risk Explanation</strong>
+                <p>{riskResult.ai.risk_explanation}</p>
+              </div>
+
+              <div style={insightBox}>
+                <strong>AI Margin Safety</strong>
+                <p>{riskResult.ai.margin_safety_explanation}</p>
+              </div>
+
+              <div style={insightBox}>
+                <strong>AI Recommended Action</strong>
+                <p>{riskResult.ai.action}</p>
+              </div>
+            </>
+          ) : (
+            <div style={insightBox}>
+              <strong>Recommendation</strong>
+              <p>{riskResult.analysis.recommendation}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={modalFooterCustom}>
+        <button
+          style={btnCancelCustom}
+          onClick={() => {
+            setShowRiskModal(false);
+            setRiskResult(null);
+            setRiskLoading(false);
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {showDeleteConfirm && (
         <div style={modalOverlay}>
@@ -2265,6 +2279,18 @@ const inlineAlertStyle = {
   marginBottom: "16px",
   borderRadius: "10px",
   fontWeight: "600",
+};
+
+const riskLoadingBox = {
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+  backgroundColor: "#f9f6ff",
+  borderLeft: "5px solid #5b2d89",
+  padding: "18px",
+  borderRadius: "14px",
+  color: "#2d1b4e",
+  fontSize: "14px",
 };
 
 export default Products;
