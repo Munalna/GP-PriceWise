@@ -42,8 +42,14 @@ function getSeasonStatus(season) {
 
 const STATUS_CONFIG = {
   active: { label: "Active", bg: "#1f9d55" },
-  passed: { label: "Passed", bg: "#b45309" },
-  upcoming: { label: "Upcoming", bg: "#2563eb" },
+  passed: { label: "Passed", bg: "#914d16" },
+ passed: { label: "Passed", bg: "#656a74" },
+  //passed: { label: "Passed", bg: "#b45309" },
+  upcoming: { label: "Upcoming", bg: "#b45309" },
+  //upcoming: { label: "Upcoming", bg: "#451991" },
+  //upcoming: { label: "Upcoming", bg: "#7c3aed" },
+  //upcoming: { label: "Upcoming", bg: "#cdb411" },
+  //upcoming: { label: "Upcoming", bg: "#2563eb"},
 };
 
 const STATUS_ORDER = { active: 0, upcoming: 1, passed: 2 };
@@ -336,8 +342,8 @@ export default function Seasons() {
   <div style={styles.actions}>
     {!isPassed && (
       <button
-        style={{ ...styles.iconBtn, background: "#382372" }}
-        // style={{ ...styles.iconBtn, background: "#1273b4" }}
+        //style={{ ...styles.iconBtn, background: "#382372" }}
+        style={{ ...styles.iconBtn, background: "#1273b4" }}
         onClick={() => openRulesModal(season)}
         type="button"
         title="Assign Rules"

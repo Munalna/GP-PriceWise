@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChartColumnDecreasing } from "lucide-react";
 import { CiLink, CiEdit } from "react-icons/ci";
@@ -135,11 +135,20 @@ const normalize = (row) => ({
   createdAt: row?.created_at ?? "",
 });
 
-export default function PricingRules() {
+ export default function PricingRules() {
   const queryClient = useQueryClient();
+
   const [showModal, setShowModal] = useState(false);
- const [editing, setEditing] = useState(null);
-const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    if (!successMsg) return;
+
+    const timer = setTimeout(() => setSuccessMsg(""), 4000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
@@ -179,33 +188,38 @@ const [deleteTarget, setDeleteTarget] = useState(null);
     setShowModal(true);
   };
 
-  const onSave = async ({ name, type, value }) => {
-    try {
-      if (!editing) {
-        await createPricingRule({ name, type, value });
-      } else {
-        await updatePricingRule(editing.id, { name, type, value });
-      }
-
-      await invalidate();
-      setShowModal(false);
-      setEditing(null);
-    } catch (e) {
-      alert(
-        e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          "Save failed"
-      );
+ const onSave = async ({ name, type, value }) => {
+  try {
+    if (!editing) {
+      await createPricingRule({ name, type, value });
+      setSuccessMsg(`"${name}" was created successfully.`);
+    } else {
+      await updatePricingRule(editing.id, { name, type, value });
+      setSuccessMsg(`"${name}" was updated successfully.`);
     }
-  };
+
+    await invalidate();
+    setShowModal(false);
+    setEditing(null);
+  } catch (e) {
+    alert(
+      e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Save failed"
+    );
+  }
+};
 
   const onDelete = async () => {
   if (!deleteTarget) return;
 
+  const ruleName = deleteTarget.name;
+
   try {
     await deletePricingRule(deleteTarget.id);
     await invalidate();
+    setSuccessMsg(`"${ruleName}" was deleted successfully.`);
     setDeleteTarget(null);
   } catch (e) {
     alert(
@@ -218,21 +232,34 @@ const [deleteTarget, setDeleteTarget] = useState(null);
 };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.headerRow}>
-        <div>
-          <h2 style={styles.title}>Pricing Rules</h2>
-          <p style={styles.subtitle}>
-            Manage pricing rules that guide recommended price calculations.
-          </p>
-        </div>
-
-        <button style={styles.primaryBtn} onClick={openCreate} type="button">
-          + Create Rule
-        </button>
+  <div style={styles.page}>
+    <div style={styles.headerRow}>
+      <div>
+        <h2 style={styles.title}>Pricing Rules</h2>
+        <p style={styles.subtitle}>
+          Manage pricing rules that guide recommended price calculations.
+        </p>
       </div>
 
-      {error && (
+      <button style={styles.primaryBtn} onClick={openCreate} type="button">
+        + Create Rule
+      </button>
+    </div>
+
+    {successMsg && (
+      <div style={styles.successBox}>
+        <span>✓ {successMsg}</span>
+        <button
+          style={styles.dismissBtn}
+          onClick={() => setSuccessMsg("")}
+          type="button"
+        >
+          ✕
+        </button>
+      </div>
+    )}
+
+    {error && (
         <div style={styles.errorBox}>
           <span>
             <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
@@ -370,7 +397,7 @@ function PricingRuleModal({ initial, onClose, onSave }) {
       ? initial.value
       : getDefaultRuleValue(initialType)
   );
-
+  const [formError, setFormError] = useState("");
   const config = getRuleConfig(type);
 
   const handleTypeChange = (newType) => {
@@ -379,53 +406,55 @@ function PricingRuleModal({ initial, onClose, onSave }) {
   };
 
   const submit = () => {
-    if (!name.trim()) return alert("Rule name required");
-    if (!type.trim()) return alert("Rule type required");
+  setFormError("");
 
-    if (value === "" || value === null || value === undefined) {
-      return alert("Value required");
+  if (!name.trim()) return setFormError("Rule name is required.");
+  if (!type.trim()) return setFormError("Rule type is required.");
+
+  if (value === "" || value === null || value === undefined) {
+    return setFormError("Rule value is required.");
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return setFormError("Value must be a valid number.");
+  }
+
+  if (type === "profit margin" || type === "minimum margin") {
+    if (numericValue <= 0 || numericValue >= 100) {
+      return setFormError("Margin value must be greater than 0 and less than 100.");
+    }
+  }
+
+  if (type === "maximum price") {
+    if (numericValue <= 0) {
+      return setFormError("Maximum price must be greater than 0.");
     }
 
-    const numericValue = Number(value);
-
-    if (!Number.isFinite(numericValue)) {
-      return alert("Value must be a valid number");
+    if (numericValue > 9999) {
+      return setFormError("Maximum price is too high.");
     }
 
-    if (type === "profit margin" || type === "minimum margin") {
-      if (numericValue <= 0 || numericValue >= 100) {
-        return alert("Margin value must be greater than 0 and less than 100");
-      }
+    if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
+      return setFormError("Maximum price can have up to two decimal places only.");
     }
+  }
 
-    if (type === "maximum price") {
-      if (numericValue <= 0) {
-        return alert("Maximum price must be greater than 0");
-      }
+  if (type === "rounding") {
+    const allowedRoundingValues = [0, 0.5, 0.99];
 
-      if (numericValue > 9999) {
-        return alert("Maximum price is too high");
-      }
-
-      if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
-        return alert("Maximum price can have up to two decimal places only");
-      }
+    if (!allowedRoundingValues.includes(numericValue)) {
+      return setFormError("Rounding value must be 0.00, 0.50, or 0.99.");
     }
+  }
 
-    if (type === "rounding") {
-      const allowedRoundingValues = [0, 0.5, 0.99];
-
-      if (!allowedRoundingValues.includes(numericValue)) {
-        return alert("Rounding value must be 0.00, 0.50, or 0.99");
-      }
-    }
-
-    onSave({
-      name: name.trim(),
-      type: type.trim(),
-      value: numericValue,
-    });
-  };
+  onSave({
+    name: name.trim(),
+    type: type.trim(),
+    value: numericValue,
+  });
+};
 
   return (
     <div style={styles.overlay}>
@@ -440,7 +469,9 @@ function PricingRuleModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Rule Name</label>
+          <label style={styles.label}>
+  Rule Name <span style={styles.requiredStar}>*</span>
+</label>
           <input
             style={styles.input}
             value={name}
@@ -450,7 +481,9 @@ function PricingRuleModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Rule Type</label>
+          <label style={styles.label}>
+  Rule Type <span style={styles.requiredStar}>*</span>
+</label>
           <select
             style={styles.input}
             value={type}
@@ -465,7 +498,9 @@ function PricingRuleModal({ initial, onClose, onSave }) {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>{config?.valueLabel || "Value"}</label>
+          <label style={styles.label}>
+  {config?.valueLabel || "Value"} <span style={styles.requiredStar}>*</span>
+</label>
 
           {config?.inputType === "select" ? (
             <select
@@ -500,14 +535,16 @@ function PricingRuleModal({ initial, onClose, onSave }) {
           )}
         </div>
 
-        <div style={styles.modalFooter}>
-          <button style={styles.secondaryBtn} onClick={onClose} type="button">
-            Cancel
-          </button>
-          <button style={styles.primaryBtn} onClick={submit} type="button">
-            Save
-          </button>
-        </div>
+        {formError && <div style={styles.formError}>{formError}</div>}
+
+<div style={styles.modalFooter}>
+  <button style={styles.secondaryBtn} onClick={onClose} type="button">
+    Cancel
+  </button>
+  <button style={styles.primaryBtn} onClick={submit} type="button">
+    Save
+  </button>
+</div>
       </div>
     </div>
   );
@@ -764,6 +801,46 @@ confirmFooter: {
   display: "flex",
   justifyContent: "center",
   gap: 12,
+},
+successBox: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  background: "#f0fdf4",
+  border: "1px solid #bbf7d0",
+  color: "#15803d",
+  padding: "10px 14px",
+  borderRadius: 12,
+  marginBottom: 12,
+  fontWeight: 600,
+  fontSize: 14,
+},
+
+dismissBtn: {
+  border: "none",
+  background: "transparent",
+  color: "#15803d",
+  cursor: "pointer",
+  fontWeight: 900,
+  fontSize: 14,
+  padding: "0 4px",
+},
+
+formError: {
+  marginTop: 10,
+  padding: "10px 14px",
+  background: "#fff1f2",
+  border: "1px solid #fecdd3",
+  color: "#9f1239",
+  borderRadius: 10,
+  fontSize: 13,
+  fontWeight: 600,
+},
+
+requiredStar: {
+  color: "#e74c3c",
+  fontWeight: "bold",
 },
 
 };
