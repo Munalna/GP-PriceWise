@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Container, Alert, Spinner, Row, Col } from "react-bootstrap";
+import { Alert, Spinner } from "react-bootstrap";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import FixedCostsSection from "../components/cost/FixedCostsSection";
@@ -19,6 +19,7 @@ import {
 const Costs = () => {
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState("all");
 
   const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
     queryKey: ["fixedCosts"],
@@ -34,61 +35,169 @@ const Costs = () => {
 
   const loading = loadingFixed || loadingVars;
 
-  const invalidateFixed = () => queryClient.invalidateQueries({ queryKey: ["fixedCosts"] });
-  const invalidateVars  = () => queryClient.invalidateQueries({ queryKey: ["varComponents"] });
+  const invalidateFixed = () =>
+    queryClient.invalidateQueries({ queryKey: ["fixedCosts"] });
+
+  const invalidateVars = () =>
+    queryClient.invalidateQueries({ queryKey: ["varComponents"] });
 
   return (
-    <Container fluid className="p-0">
-      <h2 className="page-title mb-4">Cost Management</h2>
+    <div style={styles.page}>
+      <div style={styles.headerRow}>
+        <div>
+          <h2 style={styles.title}>Cost Management</h2>
+          <p style={styles.subtitle}>
+            Manage fixed costs and variable components used in product pricing.
+          </p>
+        </div>
+      </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
 
       {loading ? (
-        <div className="d-flex align-items-center gap-2">
+        <div style={styles.loadingRow}>
           <Spinner animation="border" size="sm" />
-          <span>Loading...</span>
+          <span>Loading costs...</span>
         </div>
       ) : (
-        <Row className="g-4 align-items-start">
-          <Col xs={12} lg={6}>
-            <FixedCostsSection
-              items={fixedCosts}
-              onAdd={async (payload) => {
-                await createFixedCost(payload);
-                await invalidateFixed();
-              }}
-              onEdit={async (id, payload) => {
-                await updateFixedCost(id, payload);
-                await invalidateFixed();
-              }}
-              onDelete={async (id) => {
-                await deleteFixedCost(id);
-                await invalidateFixed();
-              }}
-            />
-          </Col>
+        <>
+  <div style={styles.filterRow}>
+    <button
+      style={viewMode === "all" ? styles.filterBtnActive : styles.filterBtn}
+      onClick={() => setViewMode("all")}
+      type="button"
+    >
+      All
+    </button>
 
-          <Col xs={12} lg={6}>
-            <VariableComponentsSection
-              items={components}
-              onAdd={async (payload) => {
-                await createVariableComponent(payload);
-                await invalidateVars();
-              }}
-              onEdit={async (id, payload) => {
-                await updateVariableComponent(id, payload);
-                await invalidateVars();
-              }}
-              onDelete={async (id) => {
-                await deleteVariableComponent(id);
-                await invalidateVars();
-              }}
-            />
-          </Col>
-        </Row>
+    <button
+      style={viewMode === "fixed" ? styles.filterBtnActive : styles.filterBtn}
+      onClick={() => setViewMode("fixed")}
+      type="button"
+    >
+      Fixed Costs
+    </button>
+
+    <button
+      style={viewMode === "variable" ? styles.filterBtnActive : styles.filterBtn}
+      onClick={() => setViewMode("variable")}
+      type="button"
+    >
+      Variable Components
+    </button>
+  </div>
+
+  <div style={styles.grid}>
+    {(viewMode === "all" || viewMode === "fixed") && (
+      <FixedCostsSection
+        items={fixedCosts}
+        onAdd={async (payload) => {
+          await createFixedCost(payload);
+          await invalidateFixed();
+        }}
+        onEdit={async (id, payload) => {
+          await updateFixedCost(id, payload);
+          await invalidateFixed();
+        }}
+        onDelete={async (id) => {
+          await deleteFixedCost(id);
+          await invalidateFixed();
+        }}
+      />
+    )}
+
+    {(viewMode === "all" || viewMode === "variable") && (
+      <VariableComponentsSection
+        items={components}
+        onAdd={async (payload) => {
+          await createVariableComponent(payload);
+          await invalidateVars();
+        }}
+        onEdit={async (id, payload) => {
+          await updateVariableComponent(id, payload);
+          await invalidateVars();
+        }}
+        onDelete={async (id) => {
+          await deleteVariableComponent(id);
+          await invalidateVars();
+        }}
+      />
+    )}
+  </div>
+</>
+      
       )}
-    </Container>
+    </div>
   );
+};
+
+const styles = {
+  page: {
+    padding: 22,
+    maxWidth: 1200,
+  },
+
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 16,
+  },
+
+  title: {
+    margin: 0,
+    fontSize: 34,
+    fontWeight: 900,
+    color: "#111827",
+  },
+
+  subtitle: {
+    margin: "6px 0 0",
+    color: "#6b7280",
+    fontSize: 14,
+  },
+
+ grid: {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 20,
+  alignItems: "start",
+},
+
+  filterRow: {
+  display: "flex",
+  gap: 10,
+  marginBottom: 16,
+  flexWrap: "wrap",
+},
+
+filterBtn: {
+  border: "1px solid #e5e7eb",
+  background: "#fff",
+  color: "#382372",
+  borderRadius: 999,
+  padding: "9px 16px",
+  cursor: "pointer",
+  fontWeight: 900,
+},
+
+filterBtnActive: {
+  border: "1px solid #382372",
+  background: "#382372",
+  color: "#fff",
+  borderRadius: 999,
+  padding: "9px 16px",
+  cursor: "pointer",
+  fontWeight: 900,
+},
+
+  loadingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    color: "#475569",
+  },
 };
 
 export default Costs;
