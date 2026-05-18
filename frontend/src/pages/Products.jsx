@@ -449,7 +449,12 @@ const componentHelpText =
   return (
     <div style={pageContainer}>
       <div style={headerStyle}>
-        <h1 style={mainTitle}>Products Management</h1>
+        <div>
+  <h1 style={mainTitle}>Products Management</h1>
+  <p style={subtitleStyle}>
+    Manage products, components, pricing rules, and smart recommendations.
+  </p>
+</div>
         <button
           style={btnMainAdd}
           onClick={() => {
@@ -1627,13 +1632,26 @@ const componentHelpText =
 }
 
 
-
 const pageContainer = {
-padding: "40px",
-  backgroundColor: "#f8f9fc",
+  padding: "40px",
+  backgroundColor: "transparent",
   minHeight: "100vh",
+  boxSizing: "border-box",
 };
 
+/*
+
+const pageContainer = {
+
+  padding: "40px",
+
+  backgroundColor: "#f8f9fc",
+
+  minHeight: "100vh",
+
+};
+
+*/
 /*const pageContainer = {
 
   padding: "22px",
@@ -1861,6 +1879,12 @@ const modalOverlay = {
   alignItems: "center",
   padding: "24px",
   zIndex: 1000,
+};
+
+const subtitleStyle = {
+  color: "#6b7280",
+  fontSize: "14px",
+  marginTop: "6px",
 };
 
 const categoryTitleRow = {
