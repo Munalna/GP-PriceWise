@@ -14,6 +14,7 @@ function Products() {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
+  
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
@@ -63,6 +64,7 @@ function Products() {
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
   const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
  const [categoryToDelete, setCategoryToDelete] = useState(null);
+ const [productToDelete, setProductToDelete] = useState(null);
   const [feedback, setFeedback] = useState({
   type: "",
   message: "",
@@ -302,14 +304,21 @@ const confirmDelete = async () => {
 
     setShowDeleteConfirm(false);
     setProductIdToDelete(null);
+    setProductToDelete(null);
 
-    showFeedback("success", "Product deleted successfully.", `category-${deletedProductCategoryId}`);
+    showFeedback(
+      "success",
+      "Product deleted successfully.",
+      `category-${deletedProductCategoryId}`
+    );
 
     setTimeout(async () => {
       await invalidate();
     }, 1200);
   } catch (err) {
     setShowDeleteConfirm(false);
+    setProductToDelete(null);
+
     showFeedback(
       "danger",
       err.response?.data?.error || err.message || "Error deleting product.",
@@ -686,6 +695,7 @@ const componentHelpText =
       title="Delete Product"
       onClick={() => {
         setProductIdToDelete(prod.id);
+        setProductToDelete(prod);
         setShowDeleteConfirm(true);
       }}
     >
@@ -853,7 +863,7 @@ const componentHelpText =
                 marginBottom: "10px",
               }}
             >
-              Are you sure?
+              Delete Product?
             </h3>
             <p
               style={{
@@ -862,8 +872,7 @@ const componentHelpText =
                 marginBottom: "25px",
               }}
             >
-              This action cannot be undone. The product will be permanently
-              removed.
+              This action cannot be undone. Product "{productToDelete?.name}" will be permanently removed.
             </p>
             <div style={{ ...modalFooterCustom, justifyContent: "center" }}>
               <button
