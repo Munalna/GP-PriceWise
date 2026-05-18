@@ -85,10 +85,17 @@ const InfoCard = ({ icon, title, text }) => (
   </div>
 );
 
+//const page = {
+  //padding: "40px",
+  //backgroundColor: "#f8f9fc",
+ // minHeight: "100vh",
+//};
+
 const page = {
   padding: "40px",
-  backgroundColor: "#f8f9fc",
+  backgroundColor: "transparent",
   minHeight: "100vh",
+  boxSizing: "border-box",
 };
 
 const heroCard = {
