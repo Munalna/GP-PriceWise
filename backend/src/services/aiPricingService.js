@@ -14,8 +14,8 @@ return genAI.getGenerativeModel({
   model: MODEL_NAME,
   generationConfig: {
     temperature: 0.2,
-    maxOutputTokens: 350,
-    responseMimeType: "application/json",
+   // maxOutputTokens: 350,  //مدري احذفهم ولا
+    //responseMimeType: "application/json",
   },
 });
 }
