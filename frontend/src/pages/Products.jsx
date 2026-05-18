@@ -1322,21 +1322,20 @@ const componentHelpText =
 
             </div>
 
-          <div style={modalFooterCustom}>
-  <button
-    style={btnCancelCustom}
-    onClick={() => {
-      setShowAddModal(false);
-      setModalError("");
-    }}
-  >
-    Cancel
-  </button>
-
-  <button style={btnSaveCustom} onClick={handleSaveProduct}>
-    Save
-  </button>
-</div>
+            <div style={modalFooterCustom}>
+              <button style={btnSaveCustom} onClick={handleSaveProduct}>
+                Save
+              </button>
+              <button
+                style={btnCancelCustom}
+                onClick={() => {
+                  setShowAddModal(false);
+                  setModalError("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1556,23 +1555,22 @@ const componentHelpText =
               </div>
             </div>
 
-           <div style={modalFooterCustom}>
-  <button
-    style={btnCancelCustom}
-    onClick={() => {
-      setShowEditModal(false);
-      setModalError("");
-      setEditCatName("");
-      setShowEditCategoryInput(false);
-    }}
-  >
-    Cancel
-  </button>
-
-  <button style={btnSaveCustom} onClick={handleUpdateProduct}>
-    Save Changes
-  </button>
-</div>
+            <div style={modalFooterCustom}>
+              <button style={btnSaveCustom} onClick={handleUpdateProduct}>
+                Save Changes
+              </button>
+              <button
+                style={btnCancelCustom}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setModalError("");
+                  setEditCatName("");
+                  setShowEditCategoryInput(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1633,14 +1631,6 @@ const componentHelpText =
 }
 
 
-const pageContainer = {
-  padding: "40px",
-  backgroundColor: "transparent",
-  minHeight: "100vh",
-  boxSizing: "border-box",
-};
-
-/*
 
 const pageContainer = {
   padding: "22px",
@@ -1866,12 +1856,6 @@ const modalOverlay = {
   alignItems: "center",
   padding: "24px",
   zIndex: 1000,
-};
-
-const subtitleStyle = {
-  color: "#6b7280",
-  fontSize: "14px",
-  marginTop: "6px",
 };
 
 const categoryTitleRow = {
