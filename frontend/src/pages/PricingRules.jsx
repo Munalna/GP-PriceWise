@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChartColumnDecreasing } from "lucide-react";
 import { CiLink, CiEdit } from "react-icons/ci";
 import { FaRegTrashAlt } from "react-icons/fa";
+import { RiAlertLine } from "react-icons/ri";
 import {
   getPricingRules,
   createPricingRule,
@@ -137,7 +138,8 @@ const normalize = (row) => ({
 export default function PricingRules() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
+ const [editing, setEditing] = useState(null);
+const [deleteTarget, setDeleteTarget] = useState(null);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
@@ -198,21 +200,22 @@ export default function PricingRules() {
     }
   };
 
-  const onDelete = async (id) => {
-    if (!window.confirm("Delete this pricing rule?")) return;
+  const onDelete = async () => {
+  if (!deleteTarget) return;
 
-    try {
-      await deletePricingRule(id);
-      await invalidate();
-    } catch (e) {
-      alert(
-        e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          "Delete failed"
-      );
-    }
-  };
+  try {
+    await deletePricingRule(deleteTarget.id);
+    await invalidate();
+    setDeleteTarget(null);
+  } catch (e) {
+    alert(
+      e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Delete failed"
+    );
+  }
+};
 
   return (
     <div style={styles.page}>
@@ -292,8 +295,8 @@ export default function PricingRules() {
 </button>
 
 <button
-  style={{ ...styles.iconBtn, background: "#e13421", }}
-  onClick={() => onDelete(rule.id)}
+  style={{ ...styles.iconBtn, background: "#e13421" }}
+  onClick={() => setDeleteTarget(rule)}
   type="button"
 >
   <FaRegTrashAlt size={13} />
@@ -308,6 +311,40 @@ export default function PricingRules() {
           </div>
         )}
       </div>
+
+      {deleteTarget && (
+  <div style={styles.overlay}>
+    <div style={styles.confirmModal}>
+      <div style={styles.alertIcon}>
+        <RiAlertLine size={38} />
+      </div>
+
+      <h3 style={styles.confirmTitle}>Delete pricing rule?</h3>
+
+      <p style={styles.confirmText}>
+        This action cannot be undone. Rule "{deleteTarget.name}" will be permanently removed.
+      </p>
+
+      <div style={styles.confirmFooter}>
+        <button
+          style={styles.secondaryBtn}
+          onClick={() => setDeleteTarget(null)}
+          type="button"
+        >
+          Cancel
+        </button>
+
+        <button
+          style={{ ...styles.primaryBtn, background: "#e13421" }}
+          onClick={onDelete}
+          type="button"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {showModal && (
         <PricingRuleModal
@@ -688,4 +725,45 @@ iconBtn: {
     fontWeight: 900,
     whiteSpace: "nowrap",
   },
+
+  confirmModal: {
+  width: 350,
+  background: "#fff",
+  borderRadius: 16,
+  padding: 24,
+  textAlign: "center",
+  boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+},
+
+alertIcon: {
+  width: 70,
+  height: 70,
+  borderRadius: "50%",
+  background: "#fff4e5",
+  color: "#f59e0b",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  margin: "0 auto 16px",
+},
+
+confirmTitle: {
+  margin: "0 0 10px",
+  fontSize: 20,
+  fontWeight: 900,
+  color: "#382372",
+},
+
+confirmText: {
+  color: "#666",
+  fontSize: 14,
+  marginBottom: 25,
+},
+
+confirmFooter: {
+  display: "flex",
+  justifyContent: "center",
+  gap: 12,
+},
+
 };

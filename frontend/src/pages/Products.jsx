@@ -7,12 +7,14 @@ import { getAIPriceRecommendation, checkMarketProduct } from "../services/analyt
 import { ChartColumnDecreasing } from "lucide-react";
 import { CiLink, CiEdit } from "react-icons/ci";
 import { FaRegTrashAlt } from "react-icons/fa";
+import { RiAlertLine } from "react-icons/ri";
 
 const API_URL = "/api/products";
 function Products() {
   const { user } = useAuth();
   const userId = user?.id;
   const queryClient = useQueryClient();
+  
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
@@ -60,6 +62,9 @@ function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
+  const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
+ const [categoryToDelete, setCategoryToDelete] = useState(null);
+ const [productToDelete, setProductToDelete] = useState(null);
   const [feedback, setFeedback] = useState({
   type: "",
   message: "",
@@ -125,20 +130,35 @@ const showCategoryFeedback = (type, message) => {
     try { return JSON.parse(compData); } catch (e) { return []; }
   };
 
-  const handleAnalyzePricing = async (productId) => {
-    setRiskLoading(true);
-    setError("");
-    try {
-      const result = await getAIPriceRecommendation(productId);
-      setRiskResult(result.data);
-      setShowRiskModal(true);
-      if (result.data?.ai?.recommended_price) {
-        setAiRecommendedPrices((prev) => ({ ...prev, [productId]: result.data.ai.recommended_price }));
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to analyze product pricing.");
-    } finally { setRiskLoading(false); }
-  };
+ const handleAnalyzePricing = async (productId) => {
+  setRiskLoading(true);
+  setRiskResult(null);
+  setError("");
+  setShowRiskModal(true);
+
+  try {
+    const result = await getAIPriceRecommendation(productId);
+
+    setRiskResult(result.data);
+
+    if (result.data?.ai?.recommended_price) {
+      setAiRecommendedPrices((prev) => ({
+        ...prev,
+        [productId]: result.data.ai.recommended_price,
+      }));
+    }
+  } catch (err) {
+    setError(
+      err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to analyze product pricing."
+    );
+    setShowRiskModal(false);
+  } finally {
+    setRiskLoading(false);
+  }
+};
 
   const toggleComponent = (name, isEdit = false) => {
     const target = isEdit ? selectedProduct : newProd;
@@ -299,14 +319,21 @@ const confirmDelete = async () => {
 
     setShowDeleteConfirm(false);
     setProductIdToDelete(null);
+    setProductToDelete(null);
 
-    showFeedback("success", "Product deleted successfully.", `category-${deletedProductCategoryId}`);
+    showFeedback(
+      "success",
+      "Product deleted successfully.",
+      `category-${deletedProductCategoryId}`
+    );
 
     setTimeout(async () => {
       await invalidate();
     }, 1200);
   } catch (err) {
     setShowDeleteConfirm(false);
+    setProductToDelete(null);
+
     showFeedback(
       "danger",
       err.response?.data?.error || err.message || "Error deleting product.",
@@ -371,13 +398,18 @@ const handleRenameCategory = async (cat) => {
   }
 };
 
-const handleDeleteCategory = async (cat) => {
-  if (!window.confirm(`Delete category "${cat.name}"?`)) return;
+const handleDeleteCategory = async () => {
+  if (!categoryToDelete) return;
+
+  const cat = categoryToDelete;
 
   setFeedback({ type: "", message: "", location: "" });
 
   try {
     await api.delete(`/products/categories/${cat.id}`);
+
+    setShowCategoryDeleteConfirm(false);
+    setCategoryToDelete(null);
 
     showFeedback("success", "Category deleted successfully.", `category-${cat.id}`);
 
@@ -385,6 +417,7 @@ const handleDeleteCategory = async (cat) => {
       await invalidate();
     }, 1200);
   } catch (err) {
+    setShowCategoryDeleteConfirm(false);
     showFeedback(
       "danger",
       err.response?.data?.error || err.message || "Error deleting category.",
@@ -466,17 +499,14 @@ const componentHelpText =
   style={categoryDeleteBtn}
   disabled={cat.is_virtual}
   onClick={() => {
-    if (!cat.is_virtual) handleDeleteCategory(cat);
+    if (!cat.is_virtual) {
+      setCategoryToDelete(cat);
+      setShowCategoryDeleteConfirm(true);
+    }
   }}
   title="Delete Category"
 >
-  <FaRegTrashAlt
-
-  size={14}
-
-  style={{ transform: "translateY(-2px)" }}
-
-/>
+  <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
 </button>
       </div>
 
@@ -680,6 +710,7 @@ const componentHelpText =
       title="Delete Product"
       onClick={() => {
         setProductIdToDelete(prod.id);
+        setProductToDelete(prod);
         setShowDeleteConfirm(true);
       }}
     >
@@ -703,118 +734,117 @@ const componentHelpText =
           )}
         </>
       )}
+{showRiskModal && (
+  <div style={modalOverlay}>
+    <div style={riskModalContent}>
+      <h2 style={modalTitleCustom}>Pricing Risk Analysis</h2>
 
-      {showRiskModal && riskResult && (
-        <div style={modalOverlay}>
-          <div style={riskModalContent}>
-            <h2 style={modalTitleCustom}>Pricing Risk Analysis</h2>
-
-            <div style={riskHeaderBox}>
-              <h3 style={riskProductName}>{riskResult.product.name}</h3>
-              <span style={riskScoreBadge}>
-                Risk Score: {riskResult.analysis.risk_score}
-              </span>
-            </div>
-
-            {riskResult.ai && (
-  <div style={recommendedBox}>
-    <strong>AI Recommended Price</strong>
-    <h2>{riskResult.ai.recommended_price} SAR</h2>
-    <p>{riskResult.ai.reason}</p>
-  </div>
-)}
-
-            <div style={riskGrid}>
-              <div style={riskCard}>
-                <strong>Pricing Health</strong>
-                <p>{riskResult.analysis.pricing_health}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Risk Label</strong>
-                <p>{riskResult.analysis.risk_label}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Market Comparison</strong>
-                <p>{riskResult.analysis.market_comparison}</p>
-              </div>
-
-              <div style={riskCard}>
-                <strong>Profit Impact</strong>
-                <p>{riskResult.analysis.profit_impact}</p>
-              </div>
-            </div>
-
-            <div style={riskDetailsBox}>
-              <p>
-                <strong>Current Price:</strong>{" "}
-                {riskResult.product.current_price} SAR
-              </p>
-              <p>
-                <strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR
-              </p>
-              <p>
-                <strong>Component Cost:</strong>{" "}
-                {riskResult.cost.component_cost} SAR
-              </p>
-              <p>
-                <strong>Competitor Average:</strong>{" "}
-                {riskResult.market.competitor_average_price} SAR
-              </p>
-              <p>
-                <strong>Applied Margin:</strong>{" "}
-                {riskResult.analysis.applied_margin}%
-              </p>
-              <p>
-                <strong>Profit Per Unit:</strong>{" "}
-                {riskResult.analysis.profit_per_unit} SAR
-              </p>
-            </div>
-
-            <div style={insightBox}>
-              <strong>Pricing Insight</strong>
-              <p>{riskResult.analysis.pricing_insight}</p>
-            </div>
-
-            {riskResult.ai ? (
-  <>
-    <div style={insightBox}>
-      <strong>AI Risk Explanation</strong>
-      <p>{riskResult.ai.risk_explanation}</p>
-    </div>
-
-    <div style={insightBox}>
-      <strong>AI Margin Safety</strong>
-      <p>{riskResult.ai.margin_safety_explanation}</p>
-    </div>
-
-    <div style={insightBox}>
-      <strong>AI Recommended Action</strong>
-      <p>{riskResult.ai.action}</p>
-    </div>
-  </>
-) : (
-  <div style={insightBox}>
-    <strong>Recommendation</strong>
-    <p>{riskResult.analysis.recommendation}</p>
-  </div>
-)}
-
-            <div style={modalFooterCustom}>
-              <button
-                style={btnCancelCustom}
-                onClick={() => {
-                  setShowRiskModal(false);
-                  setRiskResult(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
+      {riskLoading && (
+        <div style={riskLoadingBox}>
+          <Spinner animation="border" size="sm" variant="primary" />
+          <div>
+            <strong>Analyzing pricing risk...</strong>
+            <p style={{ margin: 0 }}>
+              PriceWise is calculating costs, rules, market position, and AI recommendation.
+            </p>
           </div>
         </div>
       )}
+
+      {!riskLoading && riskResult && (
+        <>
+          <div style={riskHeaderBox}>
+            <h3 style={riskProductName}>{riskResult.product.name}</h3>
+            <span style={riskScoreBadge}>
+              Risk Score: {riskResult.analysis.risk_score}
+            </span>
+          </div>
+
+          {riskResult.ai && (
+            <div style={recommendedBox}>
+              <strong>AI Recommended Price</strong>
+              <h2>{riskResult.ai.recommended_price} SAR</h2>
+              <p>{riskResult.ai.reason}</p>
+            </div>
+          )}
+
+          <div style={riskGrid}>
+            <div style={riskCard}>
+              <strong>Pricing Health</strong>
+              <p>{riskResult.analysis.pricing_health}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Risk Label</strong>
+              <p>{riskResult.analysis.risk_label}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Market Comparison</strong>
+              <p>{riskResult.analysis.market_comparison}</p>
+            </div>
+
+            <div style={riskCard}>
+              <strong>Profit Impact</strong>
+              <p>{riskResult.analysis.profit_impact}</p>
+            </div>
+          </div>
+
+          <div style={riskDetailsBox}>
+            <p><strong>Current Price:</strong> {riskResult.product.current_price} SAR</p>
+            <p><strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR</p>
+            <p><strong>Component Cost:</strong> {riskResult.cost.component_cost} SAR</p>
+            <p><strong>Competitor Average:</strong> {riskResult.market.competitor_average_price} SAR</p>
+            <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
+            <p><strong>Profit Per Unit:</strong> {riskResult.analysis.profit_per_unit} SAR</p>
+          </div>
+
+          <div style={insightBox}>
+            <strong>Pricing Insight</strong>
+            <p>{riskResult.analysis.pricing_insight}</p>
+          </div>
+
+          {riskResult.ai ? (
+            <>
+              <div style={insightBox}>
+                <strong>AI Risk Explanation</strong>
+                <p>{riskResult.ai.risk_explanation}</p>
+              </div>
+
+              <div style={insightBox}>
+                <strong>AI Margin Safety</strong>
+                <p>{riskResult.ai.margin_safety_explanation}</p>
+              </div>
+
+              <div style={insightBox}>
+                <strong>AI Recommended Action</strong>
+                <p>{riskResult.ai.action}</p>
+              </div>
+            </>
+          ) : (
+            <div style={insightBox}>
+              <strong>Recommendation</strong>
+              <p>{riskResult.analysis.recommendation}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={modalFooterCustom}>
+        <button
+          style={btnCancelCustom}
+          onClick={() => {
+            setShowRiskModal(false);
+            setRiskResult(null);
+            setRiskLoading(false);
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {showDeleteConfirm && (
         <div style={modalOverlay}>
@@ -825,7 +855,21 @@ const componentHelpText =
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: "40px", marginBottom: "10px" }}>⚠️</div>
+           <div
+  style={{
+    width: "70px",
+    height: "70px",
+    borderRadius: "50%",
+    background: "#fff4e5",
+    color: "#f59e0b",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 16px",
+  }}
+>
+  <RiAlertLine size={38} />
+</div>
             <h3
               style={{
                 ...modalTitleCustom,
@@ -833,7 +877,7 @@ const componentHelpText =
                 marginBottom: "10px",
               }}
             >
-              Are you sure?
+              Delete Product?
             </h3>
             <p
               style={{
@@ -842,8 +886,7 @@ const componentHelpText =
                 marginBottom: "25px",
               }}
             >
-              This action cannot be undone. The product will be permanently
-              removed.
+              This action cannot be undone. Product "{productToDelete?.name}" will be permanently removed.
             </p>
             <div style={{ ...modalFooterCustom, justifyContent: "center" }}>
               <button
@@ -866,6 +909,116 @@ const componentHelpText =
           </div>
         </div>
       )}
+
+ {showCategoryDeleteConfirm && categoryToDelete && (
+
+        <div style={modalOverlay}>
+
+          <div
+
+            style={{
+
+              ...modalContentCustom,
+
+              width: "350px",
+
+              textAlign: "center",
+
+            }}
+
+          >
+
+            <div
+
+              style={{
+
+                width: "70px",
+
+                height: "70px",
+
+                borderRadius: "50%",
+
+                background: "#fff4e5",
+
+                color: "#f59e0b",
+
+                display: "flex",
+
+                alignItems: "center",
+
+                justifyContent: "center",
+
+                margin: "0 auto 16px",
+
+              }}
+
+            >
+
+              <RiAlertLine size={38} />
+
+            </div>
+
+            <h3 style={{ ...modalTitleCustom, fontSize: "20px", marginBottom: "10px" }}>
+
+              Delete category?
+
+            </h3>
+
+            <p style={{ color: "#666", fontSize: "14px", marginBottom: "25px" }}>
+
+              This action cannot be undone. Category "{categoryToDelete.name}" will be permanently removed.
+
+            </p>
+
+            <div style={{ ...modalFooterCustom, justifyContent: "center" }}>
+
+              <button
+
+                style={{ ...btnCancelCustom, padding: "10px 20px" }}
+
+                onClick={() => {
+
+                  setShowCategoryDeleteConfirm(false);
+
+                  setCategoryToDelete(null);
+
+                }}
+
+              >
+
+                Cancel
+
+              </button>
+
+              <button
+
+                style={{
+
+                  ...btnSaveCustom,
+
+                  backgroundColor: "#e13421",
+
+                  padding: "10px 20px",
+
+                }}
+
+                onClick={handleDeleteCategory}
+
+              >
+
+                Delete
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
 
       {showAddModal && (
         <div style={modalOverlay}>
@@ -1446,7 +1599,8 @@ const btnMainAdd = {
   padding: "12px 24px",
   borderRadius: "10px",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "900",
+  fontSize: "17px",
   marginLeft: "100px",
 };
 
@@ -1478,7 +1632,8 @@ const categoryHeader = {
 
 const catTitleText = {
   fontSize: "22px",
-  color: "#5b2d89",
+  color: "#382372",
+  fontWeight: "900",
   margin: 0,
 };
 
@@ -2124,6 +2279,18 @@ const inlineAlertStyle = {
   marginBottom: "16px",
   borderRadius: "10px",
   fontWeight: "600",
+};
+
+const riskLoadingBox = {
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+  backgroundColor: "#f9f6ff",
+  borderLeft: "5px solid #5b2d89",
+  padding: "18px",
+  borderRadius: "14px",
+  color: "#2d1b4e",
+  fontSize: "14px",
 };
 
 export default Products;
