@@ -649,9 +649,8 @@ const componentHelpText =
                     </thead>
 
                     <tbody>
-                      {cat.products.map((prod) => {
+                     {[...cat.products].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((prod) => {
                         const comps = parseComponents(prod.components);
-
                         return (
                           <tr key={prod.id}>
                             <td style={tdStyle}>
@@ -1635,7 +1634,7 @@ const componentHelpText =
 const pageContainer = {
   padding: "22px",
   maxWidth: 1200,
-  backgroundColor: "#f8f9fc",
+  backgroundColor: "transparent",
   minHeight: "100vh",
 };
 

@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-const [userName, setUserName] = useState("User");
+const [userName, setUserName] = useState("");
 
 useEffect(() => {
   const getUserName = async () => {
@@ -19,7 +19,7 @@ useEffect(() => {
       .eq("user_id", user.id)
       .single();
 
-    const name = profile?.business_name || user.email?.split("@")[0] || "User";
+    const name = profile?.business_name || user.email?.split("@")[0] || "";
     setUserName(name);
   };
 

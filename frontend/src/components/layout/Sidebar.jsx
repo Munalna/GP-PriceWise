@@ -23,7 +23,7 @@ const Sidebar = () => {
         .eq("user_id", user.id)
         .single();
 
-      const name = profile?.business_name || user.email?.split("@")[0] || "User";
+      const name = profile?.business_name || user.email?.split("@")[0] || "";
       setUserName(name);
       setUserInitials(name.charAt(0).toUpperCase());
     };
@@ -87,7 +87,7 @@ const Sidebar = () => {
             <div className="sidebar-avatar">{userInitials}</div>
 
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{userName || "User"}</div>
+              <div className="sidebar-user-name">{userName || ""}</div>
               <div className="sidebar-user-role">Admin</div>
             </div>
 
