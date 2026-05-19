@@ -20,7 +20,7 @@ function Products() {
 
 const { data: categories = [], isLoading: loadingCats } = useQuery({
   queryKey: ["products", userId],
-  queryFn: () => api.get("/products").then((r) => Array.isArray(r.data) ? r.data : []),
+ queryFn: () => api.get("/products").then((r) => Array.isArray(r.data) ? r.data : []),
   enabled: !!userId,
   staleTime: 1000 * 60 * 60,
 });
