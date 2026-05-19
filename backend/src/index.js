@@ -37,11 +37,12 @@ app.use("/api/sales-data", salesDataRoutes);
 app.use("/api/salesData", salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
 
-app.use((req, res) => {
-  res.status(404).json({
-    message: "Route not found",
-  });
-});
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.options('*', cors()); // handle preflight requests
 
 app.use(errorHandler);
 

@@ -18,19 +18,19 @@ function Products() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
-  const { data: categories = [], isLoading: loadingCats } = useQuery({
-    queryKey: ["products", userId],
-    queryFn: () => api.get("/products").then((r) => r.data),
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 60, // 1 hour
-  });
+const { data: categories = [], isLoading: loadingCats } = useQuery({
+  queryKey: ["products", userId],
+ queryFn: () => api.get("/products").then((r) => Array.isArray(r.data) ? r.data : []),
+  enabled: !!userId,
+  staleTime: 1000 * 60 * 60,
+});
 
-  const { data: varComponents = [], isLoading: loadingVC } = useQuery({
-    queryKey: ["varComponents", userId],
-    queryFn: () => api.get("/products/var-components").then((r) => r.data),
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 60 , // 1 hour
-  });
+const { data: varComponents = [], isLoading: loadingVC } = useQuery({
+  queryKey: ["varComponents", userId],
+  queryFn: () => api.get("/products/var-components").then((r) => Array.isArray(r.data) ? r.data : []),
+  enabled: !!userId,
+  staleTime: 1000 * 60 * 60,
+});
 
   const { data: pricingRules = [] } = useQuery({
     queryKey: ["pricingRules", userId],
@@ -649,9 +649,8 @@ const componentHelpText =
                     </thead>
 
                     <tbody>
-                      {cat.products.map((prod) => {
+                     {[...cat.products].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((prod) => {
                         const comps = parseComponents(prod.components);
-
                         return (
                           <tr key={prod.id}>
                             <td style={tdStyle}>
@@ -1635,7 +1634,7 @@ const componentHelpText =
 const pageContainer = {
   padding: "22px",
   maxWidth: 1200,
-  backgroundColor: "#f8f9fc",
+  backgroundColor: "transparent",
   minHeight: "100vh",
 };
 
