@@ -6,7 +6,9 @@ import {
   DollarSign,
   SlidersHorizontal,
   Calendar,
-  LayoutDashboard,
+  //LayoutDashboard,
+ //speedometer2,
+ Gauge,
   FileText,
   BarChart3,
   Bot,
@@ -200,7 +202,7 @@ const Home = () => {
           onClick={() => navigate("/reports")}
         />
         <InfoCard
-          icon={<LayoutDashboard />}
+          icon={<Gauge/>}
           title="Dashboard"
           text="See best-selling and low-selling products at a glance."
           onClick={() => navigate("/dashboard")}
