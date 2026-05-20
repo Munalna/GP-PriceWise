@@ -1461,7 +1461,7 @@ const componentHelpText =
 
               <div style={inputGroup}>
                 <label style={labelStyle}>
-  Current Price (SAR) <span style={requiredStar}>*</span>
+  Current Price (SAR)
 </label>
                 <input
                   type="text"
