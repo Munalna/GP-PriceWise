@@ -134,6 +134,11 @@ export default function Seasons() {
     return () => clearTimeout(timer);
   }, [successMsg]);
 
+  useEffect(() => {
+  if (!successMsg) return;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}, [successMsg]);
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["seasons"] });
 

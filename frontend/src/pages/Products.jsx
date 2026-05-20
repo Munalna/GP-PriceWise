@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Spinner, Alert } from "react-bootstrap";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +41,7 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
 
   const loading = loadingCats || loadingVC;
 
+const categoryRefs = React.useRef({});
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
@@ -73,6 +74,7 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
 const FEEDBACK_DURATION = 5000;
 
 const showFeedback = (type, message, location) => {
+  
   setFeedback({ type, message, location });
 
   setTimeout(() => {
@@ -93,6 +95,11 @@ const showCategoryFeedback = (type, message) => {
   }, FEEDBACK_DURATION);
 };
 
+useEffect(() => {
+  if (!feedback.location) return;
+  const el = document.getElementById(feedback.location);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}, [feedback.location, feedback.message]);
 
 
   const calculateAvg = (prices) => {
@@ -102,6 +109,8 @@ const showCategoryFeedback = (type, message) => {
     const sum = validPrices.reduce((acc, val) => acc + val, 0);
     return (sum / validPrices.length).toFixed(2);
   };
+
+  const formatNum = (val) => parseFloat(Number(val).toFixed(4)).toString();
 
   const handleCheckMarketProduct = async (name) => {
     if (!name || name.trim().length < 2) { setMarketCheck(null); return; }
@@ -488,38 +497,38 @@ const componentHelpText =
           ) : categories.length === 0 ? (
             <div style={emptySimpleStyle}>There is no product yet</div>
           ) : (
-            categories.map((cat) => ( 
-            <div key={cat.id} style={categoryCard}> 
+            categories
+            .filter((cat) => !(cat.is_virtual && (cat.products || []).length === 0))
+            .map((cat) => ( 
+           <div key={cat.id} id={`category-${cat.id}`} style={categoryCard}>
 
   <div style={categoryHeader}>
     <div>
   <div style={categoryTitleRow}>
     <h2 style={catTitleText}>{cat.name}</h2>
 
-    <button
-      style={categoryEditBtn}
-      disabled={cat.is_virtual}
-      onClick={() => {
-        if (!cat.is_virtual) handleRenameCategory(cat);
-      }}
-      title="Rename Category"
-    >
-      <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
-    </button>
+    {!cat.is_virtual && (
+      <>
+        <button
+          style={categoryEditBtn}
+          onClick={() => handleRenameCategory(cat)}
+          title="Rename Category"
+        >
+          <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
+        </button>
 
-    <button
-      style={categoryDeleteBtn}
-      disabled={cat.is_virtual}
-      onClick={() => {
-        if (!cat.is_virtual) {
-          setCategoryToDelete(cat);
-          setShowCategoryDeleteConfirm(true);
-        }
-      }}
-      title="Delete Category"
-    >
-      <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
-    </button>
+        <button
+          style={categoryDeleteBtn}
+          onClick={() => {
+            setCategoryToDelete(cat);
+            setShowCategoryDeleteConfirm(true);
+          }}
+          title="Delete Category"
+        >
+          <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
+        </button>
+      </>
+    )}
   </div>
 
   {showEditCategoryInput && selectedCategory?.id === cat.id && (
@@ -530,7 +539,16 @@ const componentHelpText =
         onChange={(e) => setEditCatName(e.target.value)}
         placeholder="Enter category name"
       />
-
+<button
+        style={{ ...btnCancelCustom, padding: "8px 14px" }}
+        onClick={() => {
+          setShowEditCategoryInput(false);
+          setSelectedCategory(null);
+          setEditCatName("");
+        }}
+      >
+        Cancel
+      </button>
       <button
   style={{ ...btnSaveCustom, padding: "8px 14px" }}
   onClick={async () => {
@@ -573,16 +591,7 @@ const componentHelpText =
   Save
 </button>
 
-      <button
-        style={{ ...btnCancelCustom, padding: "8px 14px" }}
-        onClick={() => {
-          setShowEditCategoryInput(false);
-          setSelectedCategory(null);
-          setEditCatName("");
-        }}
-      >
-        Cancel
-      </button>
+      
     </div>
   )}
 
@@ -595,20 +604,20 @@ const componentHelpText =
   </div>
 </div>
 
-                 <button
-  style={btnAssignRules}
-  disabled={cat.is_virtual}
-  onClick={() => {
-    if (cat.is_virtual) return;
-    setSelectedCategory(cat);
-    setSelectedProduct(null);
-    setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
-    setShowRulesModal(true);
-  }}
->
-  <CiLink size={20} strokeWidth={0.8} style={{ marginRight: "6px" }} />
-  Assign Rules
-</button>
+  {!cat.is_virtual && (
+    <button
+      style={btnAssignRules}
+      onClick={() => {
+        setSelectedCategory(cat);
+        setSelectedProduct(null);
+        setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
+        setShowRulesModal(true);
+      }}
+    >
+      <CiLink size={20} strokeWidth={0.8} style={{ marginRight: "6px" }} />
+      Assign Rules
+    </button>
+  )}
                 </div>
 
  {feedback.location === `category-${cat.id}` && (
@@ -695,10 +704,10 @@ const componentHelpText =
                             </td>
 
                             <td style={tdStyle}>
-                              {calculateTotalVcost(comps)} SAR
+                              {formatNum(calculateTotalVcost(comps))} SAR
                             </td>
-                            <td style={tdStyle}>{prod.b_cost} SAR</td>
-                            <td style={tdStyle}>{prod.c_price} SAR</td>
+                            <td style={tdStyle}>{formatNum(prod.b_cost)} SAR</td>
+                            <td style={tdStyle}>{formatNum(prod.c_price)} SAR</td>
                             <td
                               style={{
                                 ...tdStyle,
@@ -707,9 +716,9 @@ const componentHelpText =
                               }}
                             >
                               {aiRecommendedPrices[prod.id]
-  ? `${aiRecommendedPrices[prod.id]} SAR`
+  ? `${formatNum(aiRecommendedPrices[prod.id])} SAR`
   : prod.r_price
-  ? `${prod.r_price} SAR`
+  ? `${formatNum(prod.r_price)} SAR`
   : "Analyze"}
                             </td>
                             
@@ -738,30 +747,31 @@ const componentHelpText =
 
                         <td style={tdStyle}>
   <div style={actionGroup}>
-    <button
-  style={actionBtnPurple}
-  disabled={riskLoading}
-  title="Analyze Pricing"
-  onClick={() => handleAnalyzePricing(prod.id)}
->
-  <ChartColumnDecreasing size={16} />
-</button>
+    {!cat.is_virtual && (
+      <>
+        <button
+          style={actionBtnPurple}
+          disabled={riskLoading}
+          title="Analyze Pricing"
+          onClick={() => handleAnalyzePricing(prod.id)}
+        >
+          <ChartColumnDecreasing size={16} />
+        </button>
 
-    <button
-      style={actionBtnBlue}
-      title="Assign Rules"
-      onClick={() => {
-        setSelectedProduct({
-          ...prod,
-          components: comps,
-        });
-        setSelectedCategory(null);
-        setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
-        setShowRulesModal(true);
-      }}
-    >
-      <CiLink size={18} strokeWidth={0.8} />
-    </button>
+        <button
+          style={actionBtnBlue}
+          title="Assign Rules"
+          onClick={() => {
+            setSelectedProduct({ ...prod, components: comps });
+            setSelectedCategory(null);
+            setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
+            setShowRulesModal(true);
+          }}
+        >
+          <CiLink size={18} strokeWidth={0.8} />
+        </button>
+      </>
+    )}
 
     <button
       style={actionBtnOrange}
@@ -866,12 +876,13 @@ const componentHelpText =
           </div>
 
           <div style={riskDetailsBox}>
-            <p><strong>Current Price:</strong> {riskResult.product.current_price} SAR</p>
-            <p><strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR</p>
-            <p><strong>Component Cost:</strong> {riskResult.cost.component_cost} SAR</p>
-            <p><strong>Competitor Average:</strong> {riskResult.market.competitor_average_price} SAR</p>
-            <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
-            <p><strong>Profit Per Unit:</strong> {riskResult.analysis.profit_per_unit} SAR</p>
+            <p><strong>Current Price:</strong> {formatNum(riskResult.product.current_price)} SAR</p>
+<p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
+<p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
+<p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
+<p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
+<p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
+           
           </div>
 
           <div style={insightBox}>
@@ -1322,9 +1333,7 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleSaveProduct}>
-                Save
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => {
@@ -1333,6 +1342,9 @@ const componentHelpText =
                 }}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleSaveProduct}>
+                Save
               </button>
             </div>
           </div>
@@ -1555,9 +1567,7 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleUpdateProduct}>
-                Save Changes
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => {
@@ -1568,6 +1578,9 @@ const componentHelpText =
                 }}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleUpdateProduct}>
+                Save Changes
               </button>
             </div>
           </div>
@@ -1612,14 +1625,15 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleSaveRules}>
-                Assign Rules
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => setShowRulesModal(false)}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleSaveRules}>
+                Assign Rules
               </button>
             </div>
           </div>
@@ -1710,6 +1724,8 @@ const btnAssignRules = {
   borderRadius: "8px",
   cursor: "pointer",
   fontWeight: "bold",
+  alignSelf: "center",   // ← prevents vertical stretching
+  height: "fit-content", // ← extra safety net
 };
 
 const tableStyle = {
