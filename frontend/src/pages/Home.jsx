@@ -586,5 +586,4 @@ const chatSendBtn = {
   justifyContent: "center",
   cursor: "pointer",
 };
-
 export default Home;
