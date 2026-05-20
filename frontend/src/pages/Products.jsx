@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Spinner, Alert } from "react-bootstrap";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +41,7 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
 
   const loading = loadingCats || loadingVC;
 
+const categoryRefs = React.useRef({});
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
@@ -73,6 +74,7 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
 const FEEDBACK_DURATION = 5000;
 
 const showFeedback = (type, message, location) => {
+  
   setFeedback({ type, message, location });
 
   setTimeout(() => {
@@ -93,6 +95,11 @@ const showCategoryFeedback = (type, message) => {
   }, FEEDBACK_DURATION);
 };
 
+useEffect(() => {
+  if (!feedback.location) return;
+  const el = document.getElementById(feedback.location);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}, [feedback.location, feedback.message]);
 
 
   const calculateAvg = (prices) => {
@@ -489,7 +496,7 @@ const componentHelpText =
             <div style={emptySimpleStyle}>There is no product yet</div>
           ) : (
             categories.map((cat) => ( 
-            <div key={cat.id} style={categoryCard}> 
+           <div key={cat.id} id={`category-${cat.id}`} style={categoryCard}>
 
   <div style={categoryHeader}>
     <div>
@@ -530,7 +537,16 @@ const componentHelpText =
         onChange={(e) => setEditCatName(e.target.value)}
         placeholder="Enter category name"
       />
-
+<button
+        style={{ ...btnCancelCustom, padding: "8px 14px" }}
+        onClick={() => {
+          setShowEditCategoryInput(false);
+          setSelectedCategory(null);
+          setEditCatName("");
+        }}
+      >
+        Cancel
+      </button>
       <button
   style={{ ...btnSaveCustom, padding: "8px 14px" }}
   onClick={async () => {
@@ -573,16 +589,7 @@ const componentHelpText =
   Save
 </button>
 
-      <button
-        style={{ ...btnCancelCustom, padding: "8px 14px" }}
-        onClick={() => {
-          setShowEditCategoryInput(false);
-          setSelectedCategory(null);
-          setEditCatName("");
-        }}
-      >
-        Cancel
-      </button>
+      
     </div>
   )}
 
@@ -595,8 +602,12 @@ const componentHelpText =
   </div>
 </div>
 
-                 <button
-  style={btnAssignRules}
+  <button
+  style={{
+    ...btnAssignRules,
+    opacity: cat.is_virtual ? 0.5 : 1,
+    cursor: cat.is_virtual ? "not-allowed" : "pointer",
+  }}
   disabled={cat.is_virtual}
   onClick={() => {
     if (cat.is_virtual) return;
@@ -1322,9 +1333,7 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleSaveProduct}>
-                Save
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => {
@@ -1333,6 +1342,9 @@ const componentHelpText =
                 }}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleSaveProduct}>
+                Save
               </button>
             </div>
           </div>
@@ -1555,9 +1567,7 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleUpdateProduct}>
-                Save Changes
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => {
@@ -1568,6 +1578,9 @@ const componentHelpText =
                 }}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleUpdateProduct}>
+                Save Changes
               </button>
             </div>
           </div>
@@ -1612,14 +1625,15 @@ const componentHelpText =
             </div>
 
             <div style={modalFooterCustom}>
-              <button style={btnSaveCustom} onClick={handleSaveRules}>
-                Assign Rules
-              </button>
+             
               <button
                 style={btnCancelCustom}
                 onClick={() => setShowRulesModal(false)}
               >
                 Cancel
+              </button>
+               <button style={btnSaveCustom} onClick={handleSaveRules}>
+                Assign Rules
               </button>
             </div>
           </div>
@@ -1710,6 +1724,8 @@ const btnAssignRules = {
   borderRadius: "8px",
   cursor: "pointer",
   fontWeight: "bold",
+  alignSelf: "center",   // ← prevents vertical stretching
+  height: "fit-content", // ← extra safety net
 };
 
 const tableStyle = {

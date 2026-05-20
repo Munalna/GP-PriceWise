@@ -27,6 +27,12 @@ useEffect(() => {
   const timer = setTimeout(() => setSuccessMsg(""), 4000);
   return () => clearTimeout(timer);
 }, [successMsg]);
+
+useEffect(() => {
+  if (!successMsg) return;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}, [successMsg]);
+
   const [viewMode, setViewMode] = useState("all");
 
   const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
