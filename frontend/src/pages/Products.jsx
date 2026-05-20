@@ -497,7 +497,9 @@ const componentHelpText =
           ) : categories.length === 0 ? (
             <div style={emptySimpleStyle}>There is no product yet</div>
           ) : (
-            categories.map((cat) => ( 
+            categories
+            .filter((cat) => !(cat.is_virtual && (cat.products || []).length === 0))
+            .map((cat) => ( 
            <div key={cat.id} id={`category-${cat.id}`} style={categoryCard}>
 
   <div style={categoryHeader}>
@@ -505,30 +507,28 @@ const componentHelpText =
   <div style={categoryTitleRow}>
     <h2 style={catTitleText}>{cat.name}</h2>
 
-    <button
-      style={categoryEditBtn}
-      disabled={cat.is_virtual}
-      onClick={() => {
-        if (!cat.is_virtual) handleRenameCategory(cat);
-      }}
-      title="Rename Category"
-    >
-      <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
-    </button>
+    {!cat.is_virtual && (
+      <>
+        <button
+          style={categoryEditBtn}
+          onClick={() => handleRenameCategory(cat)}
+          title="Rename Category"
+        >
+          <CiEdit size={19} strokeWidth={0.8} style={{ display: "block" }} />
+        </button>
 
-    <button
-      style={categoryDeleteBtn}
-      disabled={cat.is_virtual}
-      onClick={() => {
-        if (!cat.is_virtual) {
-          setCategoryToDelete(cat);
-          setShowCategoryDeleteConfirm(true);
-        }
-      }}
-      title="Delete Category"
-    >
-      <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
-    </button>
+        <button
+          style={categoryDeleteBtn}
+          onClick={() => {
+            setCategoryToDelete(cat);
+            setShowCategoryDeleteConfirm(true);
+          }}
+          title="Delete Category"
+        >
+          <FaRegTrashAlt size={14} style={{ transform: "translateY(-2px)" }} />
+        </button>
+      </>
+    )}
   </div>
 
   {showEditCategoryInput && selectedCategory?.id === cat.id && (
@@ -604,24 +604,20 @@ const componentHelpText =
   </div>
 </div>
 
-  <button
-  style={{
-    ...btnAssignRules,
-    opacity: cat.is_virtual ? 0.5 : 1,
-    cursor: cat.is_virtual ? "not-allowed" : "pointer",
-  }}
-  disabled={cat.is_virtual}
-  onClick={() => {
-    if (cat.is_virtual) return;
-    setSelectedCategory(cat);
-    setSelectedProduct(null);
-    setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
-    setShowRulesModal(true);
-  }}
->
-  <CiLink size={20} strokeWidth={0.8} style={{ marginRight: "6px" }} />
-  Assign Rules
-</button>
+  {!cat.is_virtual && (
+    <button
+      style={btnAssignRules}
+      onClick={() => {
+        setSelectedCategory(cat);
+        setSelectedProduct(null);
+        setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
+        setShowRulesModal(true);
+      }}
+    >
+      <CiLink size={20} strokeWidth={0.8} style={{ marginRight: "6px" }} />
+      Assign Rules
+    </button>
+  )}
                 </div>
 
  {feedback.location === `category-${cat.id}` && (
@@ -751,30 +747,31 @@ const componentHelpText =
 
                         <td style={tdStyle}>
   <div style={actionGroup}>
-    <button
-  style={actionBtnPurple}
-  disabled={riskLoading}
-  title="Analyze Pricing"
-  onClick={() => handleAnalyzePricing(prod.id)}
->
-  <ChartColumnDecreasing size={16} />
-</button>
+    {!cat.is_virtual && (
+      <>
+        <button
+          style={actionBtnPurple}
+          disabled={riskLoading}
+          title="Analyze Pricing"
+          onClick={() => handleAnalyzePricing(prod.id)}
+        >
+          <ChartColumnDecreasing size={16} />
+        </button>
 
-    <button
-      style={actionBtnBlue}
-      title="Assign Rules"
-      onClick={() => {
-        setSelectedProduct({
-          ...prod,
-          components: comps,
-        });
-        setSelectedCategory(null);
-        setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
-        setShowRulesModal(true);
-      }}
-    >
-      <CiLink size={18} strokeWidth={0.8} />
-    </button>
+        <button
+          style={actionBtnBlue}
+          title="Assign Rules"
+          onClick={() => {
+            setSelectedProduct({ ...prod, components: comps });
+            setSelectedCategory(null);
+            setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
+            setShowRulesModal(true);
+          }}
+        >
+          <CiLink size={18} strokeWidth={0.8} />
+        </button>
+      </>
+    )}
 
     <button
       style={actionBtnOrange}
