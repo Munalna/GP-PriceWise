@@ -16,21 +16,11 @@ const RULE_TYPE_CONFIG = {
     label: "Profit Margin Rule",
     valueLabel: "Target Profit Margin (%)",
     unit: "%",
-    inputType: "select",
-    options: [10, 15, 20, 25, 30, 35, 40, 50, 60],
+    inputType: "number",
     defaultValue: 30,
+    placeholder: "e.g., 30",
     helperText:
       "Sets the target profit margin used when calculating the recommended price.",
-  },
-  "minimum margin": {
-    label: "Minimum Margin Protection",
-    valueLabel: "Minimum Allowed Margin (%)",
-    unit: "%",
-    inputType: "select",
-    options: [5, 10, 15, 20, 25, 30, 35, 40, 50],
-    defaultValue: 25,
-    helperText:
-      "Prevents the system from recommending a price below this profit margin.",
   },
   "maximum price": {
     label: "Maximum Price Limit",
@@ -39,8 +29,7 @@ const RULE_TYPE_CONFIG = {
     inputType: "number",
     defaultValue: "",
     placeholder: "e.g., 25.00",
-    helperText:
-      "The recommended price will not exceed this amount.",
+    helperText: "The recommended price will not exceed this amount.",
   },
   rounding: {
     label: "Rounding Rule",
@@ -116,10 +105,7 @@ function formatRuleValue(type, value) {
     return `${numericValue.toFixed(2)} SAR`;
   }
 
-  if (
-    (ruleType === "profit margin" || ruleType === "minimum margin") &&
-    Number.isFinite(numericValue)
-  ) {
+  if (ruleType === "profit margin" && Number.isFinite(numericValue)) {
     return `${numericValue}%`;
   }
 
@@ -135,7 +121,7 @@ const normalize = (row) => ({
   createdAt: row?.created_at ?? "",
 });
 
- export default function PricingRules() {
+export default function PricingRules() {
   const queryClient = useQueryClient();
 
   const [showModal, setShowModal] = useState(false);
@@ -149,12 +135,11 @@ const normalize = (row) => ({
     const timer = setTimeout(() => setSuccessMsg(""), 4000);
     return () => clearTimeout(timer);
   }, [successMsg]);
-  
-  useEffect(() => {
-  if (!successMsg) return;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}, [successMsg]);
 
+  useEffect(() => {
+    if (!successMsg) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [successMsg]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["pricingRules"] });
@@ -169,7 +154,7 @@ const normalize = (row) => ({
       const data = await getPricingRules();
       return Array.isArray(data) ? data.map(normalize) : [];
     },
-    staleTime: 1000 * 60 * 60 , // 1 hour
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   const error =
@@ -194,8 +179,7 @@ const normalize = (row) => ({
     setShowModal(true);
   };
 
- const onSave = async ({ name, type, value }) => {
-  try {
+  const onSave = async ({ name, type, value }) => {
     if (!editing) {
       await createPricingRule({ name, type, value });
       setSuccessMsg(`"${name}" was created successfully.`);
@@ -207,65 +191,57 @@ const normalize = (row) => ({
     await invalidate();
     setShowModal(false);
     setEditing(null);
-  } catch (e) {
-    alert(
-      e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e?.message ||
-        "Save failed"
-    );
-  }
-};
+  };
 
   const onDelete = async () => {
-  if (!deleteTarget) return;
+    if (!deleteTarget) return;
 
-  const ruleName = deleteTarget.name;
+    const ruleName = deleteTarget.name;
 
-  try {
-    await deletePricingRule(deleteTarget.id);
-    await invalidate();
-    setSuccessMsg(`"${ruleName}" was deleted successfully.`);
-    setDeleteTarget(null);
-  } catch (e) {
-    alert(
-      e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e?.message ||
-        "Delete failed"
-    );
-  }
-};
+    try {
+      await deletePricingRule(deleteTarget.id);
+      await invalidate();
+      setSuccessMsg(`"${ruleName}" was deleted successfully.`);
+      setDeleteTarget(null);
+    } catch (e) {
+      alert(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Delete failed"
+      );
+    }
+  };
 
   return (
-  <div style={styles.page}>
-    <div style={styles.headerRow}>
-      <div>
-        <h2 style={styles.title}>Pricing Rules</h2>
-        <p style={styles.subtitle}>
-          Manage pricing rules that guide recommended price calculations.
-        </p>
-      </div>
+    <div style={styles.page}>
+      <div style={styles.headerRow}>
+        <div>
+          <h2 style={styles.title}>Pricing Rules</h2>
+          <p style={styles.subtitle}>
+            Manage pricing rules that guide recommended price calculations.
+          </p>
+        </div>
 
-      <button style={styles.primaryBtn} onClick={openCreate} type="button">
-        + Create Rule
-      </button>
-    </div>
-
-    {successMsg && (
-      <div style={styles.successBox}>
-        <span>✓ {successMsg}</span>
-        <button
-          style={styles.dismissBtn}
-          onClick={() => setSuccessMsg("")}
-          type="button"
-        >
-          ✕
+        <button style={styles.primaryBtn} onClick={openCreate} type="button">
+          + Create Rule
         </button>
       </div>
-    )}
 
-    {error && (
+      {successMsg && (
+        <div style={styles.successBox}>
+          <span>✓ {successMsg}</span>
+          <button
+            style={styles.dismissBtn}
+            onClick={() => setSuccessMsg("")}
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {error && (
         <div style={styles.errorBox}>
           <span>
             <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
@@ -290,7 +266,6 @@ const normalize = (row) => ({
                   <th style={styles.th}>Rule Name</th>
                   <th style={styles.th}>Type</th>
                   <th style={styles.th}>Value</th>
-                  <th style={styles.th}>Created At</th>
                   <th style={{ ...styles.th, textAlign: "center" }}>
                     Actions
                   </th>
@@ -300,7 +275,7 @@ const normalize = (row) => ({
               <tbody>
                 {sortedRules.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={styles.emptyCell}>
+                    <td colSpan={4} style={styles.emptyCell}>
                       No pricing rules yet. Click <b>Create Rule</b>.
                     </td>
                   </tr>
@@ -312,28 +287,29 @@ const normalize = (row) => ({
                       <td style={styles.td}>
                         {formatRuleValue(rule.type, rule.value)}
                       </td>
-                      <td style={styles.td}>
-                        {rule.createdAt
-                          ? new Date(rule.createdAt).toLocaleDateString()
-                          : "-"}
-                      </td>
-                     <td style={{ ...styles.td, textAlign: "center", width: 150 }}>
+                      <td
+                        style={{
+                          ...styles.td,
+                          textAlign: "center",
+                          width: 150,
+                        }}
+                      >
                         <div style={styles.actions}>
-                           <button
-  style={styles.iconBtn}
-  onClick={() => openEdit(rule)}
-  type="button"
->
-  <CiEdit size={18} strokeWidth={0.8} />
-</button>
+                          <button
+                            style={styles.iconBtn}
+                            onClick={() => openEdit(rule)}
+                            type="button"
+                          >
+                            <CiEdit size={18} strokeWidth={0.8} />
+                          </button>
 
-<button
-  style={{ ...styles.iconBtn, background: "#e13421" }}
-  onClick={() => setDeleteTarget(rule)}
-  type="button"
->
-  <FaRegTrashAlt size={13} />
-</button>
+                          <button
+                            style={{ ...styles.iconBtn, background: "#e13421" }}
+                            onClick={() => setDeleteTarget(rule)}
+                            type="button"
+                          >
+                            <FaRegTrashAlt size={13} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -346,38 +322,39 @@ const normalize = (row) => ({
       </div>
 
       {deleteTarget && (
-  <div style={styles.overlay}>
-    <div style={styles.confirmModal}>
-      <div style={styles.alertIcon}>
-        <RiAlertLine size={38} />
-      </div>
+        <div style={styles.overlay}>
+          <div style={styles.confirmModal}>
+            <div style={styles.alertIcon}>
+              <RiAlertLine size={38} />
+            </div>
 
-      <h3 style={styles.confirmTitle}>Delete pricing rule?</h3>
+            <h3 style={styles.confirmTitle}>Delete pricing rule?</h3>
 
-      <p style={styles.confirmText}>
-        This action cannot be undone. Rule "{deleteTarget.name}" will be permanently removed.
-      </p>
+            <p style={styles.confirmText}>
+              This action cannot be undone. Rule "{deleteTarget.name}" will be
+              permanently removed.
+            </p>
 
-      <div style={styles.confirmFooter}>
-        <button
-          style={styles.secondaryBtn}
-          onClick={() => setDeleteTarget(null)}
-          type="button"
-        >
-          Cancel
-        </button>
+            <div style={styles.confirmFooter}>
+              <button
+                style={styles.secondaryBtn}
+                onClick={() => setDeleteTarget(null)}
+                type="button"
+              >
+                Cancel
+              </button>
 
-        <button
-          style={{ ...styles.primaryBtn, background: "#e13421" }}
-          onClick={onDelete}
-          type="button"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              <button
+                style={{ ...styles.primaryBtn, background: "#e13421" }}
+                onClick={onDelete}
+                type="button"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <PricingRuleModal
@@ -399,7 +376,9 @@ function PricingRuleModal({ initial, onClose, onSave }) {
   const [name, setName] = useState(initial.name || "");
   const [type, setType] = useState(initialType);
   const [value, setValue] = useState(
-    initial.value !== "" && initial.value !== null && initial.value !== undefined
+    initial.value !== "" &&
+      initial.value !== null &&
+      initial.value !== undefined
       ? initial.value
       : getDefaultRuleValue(initialType)
   );
@@ -411,56 +390,69 @@ function PricingRuleModal({ initial, onClose, onSave }) {
     setValue(getDefaultRuleValue(newType));
   };
 
-  const submit = () => {
-  setFormError("");
+  const submit = async () => {
+    setFormError("");
 
-  if (!name.trim()) return setFormError("Rule name is required.");
-  if (!type.trim()) return setFormError("Rule type is required.");
+    if (!name.trim()) return setFormError("Rule name is required.");
+    if (!type.trim()) return setFormError("Rule type is required.");
 
-  if (value === "" || value === null || value === undefined) {
-    return setFormError("Rule value is required.");
-  }
-
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return setFormError("Value must be a valid number.");
-  }
-
-  if (type === "profit margin" || type === "minimum margin") {
-    if (numericValue <= 0 || numericValue >= 100) {
-      return setFormError("Margin value must be greater than 0 and less than 100.");
-    }
-  }
-
-  if (type === "maximum price") {
-    if (numericValue <= 0) {
-      return setFormError("Maximum price must be greater than 0.");
+    if (value === "" || value === null || value === undefined) {
+      return setFormError("Rule value is required.");
     }
 
-    if (numericValue > 9999) {
-      return setFormError("Maximum price is too high.");
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+      return setFormError("Value must be a valid number.");
     }
 
-    if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
-      return setFormError("Maximum price can have up to two decimal places only.");
+    if (type === "profit margin") {
+      if (numericValue <= 0 || numericValue >= 100) {
+        return setFormError(
+          "Profit margin must be greater than 0 and less than 100."
+        );
+      }
     }
-  }
 
-  if (type === "rounding") {
-    const allowedRoundingValues = [0, 0.5, 0.99];
+    if (type === "maximum price") {
+      if (numericValue <= 0) {
+        return setFormError("Maximum price must be greater than 0.");
+      }
 
-    if (!allowedRoundingValues.includes(numericValue)) {
-      return setFormError("Rounding value must be 0.00, 0.50, or 0.99.");
+      if (numericValue > 9999) {
+        return setFormError("Maximum price is too high.");
+      }
+
+      if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
+        return setFormError(
+          "Maximum price can have up to two decimal places only."
+        );
+      }
     }
-  }
 
-  onSave({
-    name: name.trim(),
-    type: type.trim(),
-    value: numericValue,
-  });
-};
+    if (type === "rounding") {
+      const allowedRoundingValues = [0, 0.5, 0.99];
+
+      if (!allowedRoundingValues.includes(numericValue)) {
+        return setFormError("Rounding value must be 0.00, 0.50, or 0.99.");
+      }
+    }
+
+    try {
+      await onSave({
+        name: name.trim(),
+        type: type.trim(),
+        value: numericValue,
+      });
+    } catch (e) {
+      setFormError(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Save failed"
+      );
+    }
+  };
 
   return (
     <div style={styles.overlay}>
@@ -476,8 +468,8 @@ function PricingRuleModal({ initial, onClose, onSave }) {
 
         <div style={styles.field}>
           <label style={styles.label}>
-  Rule Name <span style={styles.requiredStar}>*</span>
-</label>
+            Rule Name <span style={styles.requiredStar}>*</span>
+          </label>
           <input
             style={styles.input}
             value={name}
@@ -488,25 +480,28 @@ function PricingRuleModal({ initial, onClose, onSave }) {
 
         <div style={styles.field}>
           <label style={styles.label}>
-  Rule Type <span style={styles.requiredStar}>*</span>
-</label>
+            Rule Type <span style={styles.requiredStar}>*</span>
+          </label>
           <select
             style={styles.input}
             value={type}
             onChange={(e) => handleTypeChange(e.target.value)}
           >
-            {Object.entries(RULE_TYPE_CONFIG).map(([ruleValue, ruleConfig]) => (
-              <option key={ruleValue} value={ruleValue}>
-                {ruleConfig.label}
-              </option>
-            ))}
+            {Object.entries(RULE_TYPE_CONFIG).map(
+              ([ruleValue, ruleConfig]) => (
+                <option key={ruleValue} value={ruleValue}>
+                  {ruleConfig.label}
+                </option>
+              )
+            )}
           </select>
         </div>
 
         <div style={styles.field}>
           <label style={styles.label}>
-  {config?.valueLabel || "Value"} <span style={styles.requiredStar}>*</span>
-</label>
+            {config?.valueLabel || "Value"}{" "}
+            <span style={styles.requiredStar}>*</span>
+          </label>
 
           {config?.inputType === "select" ? (
             <select
@@ -543,14 +538,14 @@ function PricingRuleModal({ initial, onClose, onSave }) {
 
         {formError && <div style={styles.formError}>{formError}</div>}
 
-<div style={styles.modalFooter}>
-  <button style={styles.secondaryBtn} onClick={onClose} type="button">
-    Cancel
-  </button>
-  <button style={styles.primaryBtn} onClick={submit} type="button">
-    Save
-  </button>
-</div>
+        <div style={styles.modalFooter}>
+          <button style={styles.secondaryBtn} onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button style={styles.primaryBtn} onClick={submit} type="button">
+            Save
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -607,37 +602,30 @@ const styles = {
     color: "#6b7280",
     fontStyle: "italic",
   },
-actions: {
-
-  display: "flex",
-
-  justifyContent: "center",
-
-  alignItems: "center",
-
-  gap: 10,
-
-  width: "100%",
-
-},
-
-iconBtn: {
-  width: 38,
-  height: 38,
-  minWidth: 38,
-  minHeight: 38,
-  border: "none",
-  background: "#f59e0b",
-  color: "#fff",
-  borderRadius: 8,
-  padding: 0,
-  cursor: "pointer",
-  fontWeight: 900,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxSizing: "border-box",
-},
+  actions: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    border: "none",
+    background: "#f59e0b",
+    color: "#fff",
+    borderRadius: 8,
+    padding: 0,
+    cursor: "pointer",
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+  },
 
   primaryBtn: {
     background: "#382372",
@@ -770,83 +758,83 @@ iconBtn: {
   },
 
   confirmModal: {
-  width: 350,
-  background: "#fff",
-  borderRadius: 16,
-  padding: 24,
-  textAlign: "center",
-  boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
-},
+    width: 350,
+    background: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    textAlign: "center",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+  },
 
-alertIcon: {
-  width: 70,
-  height: 70,
-  borderRadius: "50%",
-  background: "#fff4e5",
-  color: "#f59e0b",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  margin: "0 auto 16px",
-},
+  alertIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: "50%",
+    background: "#fff4e5",
+    color: "#f59e0b",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 16px",
+  },
 
-confirmTitle: {
-  margin: "0 0 10px",
-  fontSize: 20,
-  fontWeight: 900,
-  color: "#382372",
-},
+  confirmTitle: {
+    margin: "0 0 10px",
+    fontSize: 20,
+    fontWeight: 900,
+    color: "#382372",
+  },
 
-confirmText: {
-  color: "#666",
-  fontSize: 14,
-  marginBottom: 25,
-},
+  confirmText: {
+    color: "#666",
+    fontSize: 14,
+    marginBottom: 25,
+  },
 
-confirmFooter: {
-  display: "flex",
-  justifyContent: "center",
-  gap: 12,
-},
-successBox: {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  background: "#f0fdf4",
-  border: "1px solid #bbf7d0",
-  color: "#15803d",
-  padding: "10px 14px",
-  borderRadius: 12,
-  marginBottom: 12,
-  fontWeight: 600,
-  fontSize: 14,
-},
+  confirmFooter: {
+    display: "flex",
+    justifyContent: "center",
+    gap: 12,
+  },
 
-dismissBtn: {
-  border: "none",
-  background: "transparent",
-  color: "#15803d",
-  cursor: "pointer",
-  fontWeight: 900,
-  fontSize: 14,
-  padding: "0 4px",
-},
+  successBox: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    color: "#15803d",
+    padding: "10px 14px",
+    borderRadius: 12,
+    marginBottom: 12,
+    fontWeight: 600,
+    fontSize: 14,
+  },
 
-formError: {
-  marginTop: 10,
-  padding: "10px 14px",
-  background: "#fff1f2",
-  border: "1px solid #fecdd3",
-  color: "#9f1239",
-  borderRadius: 10,
-  fontSize: 13,
-  fontWeight: 600,
-},
+  dismissBtn: {
+    border: "none",
+    background: "transparent",
+    color: "#15803d",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 14,
+    padding: "0 4px",
+  },
 
-requiredStar: {
-  color: "#e74c3c",
-  fontWeight: "bold",
-},
+  formError: {
+    marginTop: 10,
+    padding: "10px 14px",
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#9f1239",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+  },
 
+  requiredStar: {
+    color: "#e74c3c",
+    fontWeight: "bold",
+  },
 };

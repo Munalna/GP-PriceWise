@@ -8,14 +8,11 @@ import {
 } from "../models/pricingRuleModel.js";
 
 const ALLOWED_RULE_TYPES = [
-  "minimum margin",
   "maximum price",
   "rounding",
   "profit margin",
 ];
 
-const PROFIT_MARGIN_VALUES = [10, 15, 20, 25, 30, 35, 40, 50, 60];
-const MINIMUM_MARGIN_VALUES = [5, 10, 15, 20, 25, 30, 35, 40, 50];
 const ROUNDING_VALUES = [0, 0.5, 0.99];
 
 function normalizeRuleType(ruleType) {
@@ -51,23 +48,17 @@ function validateRuleValue(type, rawValue) {
   }
 
   if (normalizedType === "profit margin") {
-    if (!PROFIT_MARGIN_VALUES.includes(value)) {
+    if (value <= 0 || value >= 100) {
       return {
         valid: false,
-        message: `Profit margin must be one of: ${PROFIT_MARGIN_VALUES.join(
-          "%, "
-        )}%`,
+        message: "Profit margin must be greater than 0 and less than 100",
       };
     }
-  }
 
-  if (normalizedType === "minimum margin") {
-    if (!MINIMUM_MARGIN_VALUES.includes(value)) {
+    if (!hasMaxTwoDecimals(rawValue)) {
       return {
         valid: false,
-        message: `Minimum margin must be one of: ${MINIMUM_MARGIN_VALUES.join(
-          "%, "
-        )}%`,
+        message: "Profit margin can have up to two decimal places only",
       };
     }
   }

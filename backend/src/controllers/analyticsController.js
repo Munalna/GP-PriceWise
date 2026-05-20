@@ -210,7 +210,7 @@ function applyPricingRulesToRecommendation(productInput, initialPrice) {
   const appliedRules = [];
 
   const profitMarginRule = findRuleByType(productInput, "profit margin");
-  const minimumMarginRule = findRuleByType(productInput, "minimum margin");
+ // const minimumMarginRule = findRuleByType(productInput, "minimum margin");
   const maximumPriceRule = findRuleByType(productInput, "maximum price");
   const roundingRule = findRuleByType(productInput, "rounding");
 
@@ -241,7 +241,7 @@ function applyPricingRulesToRecommendation(productInput, initialPrice) {
     This is a safety rule. It prevents the recommended price
     from going below the minimum allowed margin.
   */
-  if (minimumMarginRule && baseCost > 0) {
+ /* if (minimumMarginRule && baseCost > 0) {
     const marginPercent = Number(minimumMarginRule.value);
 
     if (Number.isFinite(marginPercent) && marginPercent > 0) {
@@ -256,7 +256,8 @@ function applyPricingRulesToRecommendation(productInput, initialPrice) {
         );
       }
     }
-  }
+  }  */
+
 
   /*
     Maximum Price Limit:
