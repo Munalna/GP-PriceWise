@@ -110,6 +110,8 @@ useEffect(() => {
     return (sum / validPrices.length).toFixed(2);
   };
 
+  const formatNum = (val) => parseFloat(Number(val).toFixed(4)).toString();
+
   const handleCheckMarketProduct = async (name) => {
     if (!name || name.trim().length < 2) { setMarketCheck(null); return; }
     try {
@@ -706,10 +708,10 @@ const componentHelpText =
                             </td>
 
                             <td style={tdStyle}>
-                              {calculateTotalVcost(comps)} SAR
+                              {formatNum(calculateTotalVcost(comps))} SAR
                             </td>
-                            <td style={tdStyle}>{prod.b_cost} SAR</td>
-                            <td style={tdStyle}>{prod.c_price} SAR</td>
+                            <td style={tdStyle}>{formatNum(prod.b_cost)} SAR</td>
+                            <td style={tdStyle}>{formatNum(prod.c_price)} SAR</td>
                             <td
                               style={{
                                 ...tdStyle,
@@ -718,9 +720,9 @@ const componentHelpText =
                               }}
                             >
                               {aiRecommendedPrices[prod.id]
-  ? `${aiRecommendedPrices[prod.id]} SAR`
+  ? `${formatNum(aiRecommendedPrices[prod.id])} SAR`
   : prod.r_price
-  ? `${prod.r_price} SAR`
+  ? `${formatNum(prod.r_price)} SAR`
   : "Analyze"}
                             </td>
                             
@@ -877,12 +879,13 @@ const componentHelpText =
           </div>
 
           <div style={riskDetailsBox}>
-            <p><strong>Current Price:</strong> {riskResult.product.current_price} SAR</p>
-            <p><strong>Base Cost:</strong> {riskResult.cost.base_cost} SAR</p>
-            <p><strong>Component Cost:</strong> {riskResult.cost.component_cost} SAR</p>
-            <p><strong>Competitor Average:</strong> {riskResult.market.competitor_average_price} SAR</p>
-            <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
-            <p><strong>Profit Per Unit:</strong> {riskResult.analysis.profit_per_unit} SAR</p>
+            <p><strong>Current Price:</strong> {formatNum(riskResult.product.current_price)} SAR</p>
+<p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
+<p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
+<p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
+<p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
+<p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
+           
           </div>
 
           <div style={insightBox}>
