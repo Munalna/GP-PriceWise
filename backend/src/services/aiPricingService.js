@@ -2,6 +2,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const MODEL_NAME = "gemini-2.0-flash";
 
+//const MODEL_NAME = "gemini-2.5-flash";
+//const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
 function getGeminiModel() {
   const apiKey = process.env.GEMINI_API_KEY;
 
