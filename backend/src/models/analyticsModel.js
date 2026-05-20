@@ -73,7 +73,19 @@ function getAverageFromCompetitorsPrices(competitorsPrices) {
       if (typeof item === "number") return item;
       if (typeof item === "string") return Number(item);
       if (typeof item === "object" && item !== null) {
-        return Number(item.price ?? item.value ?? item.competitor_price);
+        const candidates = [
+          item.price,
+          item.value,
+          item.competitor_price,
+          item.amount,
+          item.cost,
+          item.competitorPrice,
+          item.competitor,
+        ];
+        for (const candidate of candidates) {
+          const num = Number(candidate);
+          if (Number.isFinite(num) && num > 0) return num;
+        }
       }
       return 0;
     })
@@ -406,12 +418,14 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
   const competitorFromList = getAverageFromCompetitorsPrices(product.competitors_prices);
   const competitorFromProduct = toNumber(product.comp_price, 0);
 
-  const competitorAveragePrice =
-    competitorFromMarket > 0
-      ? competitorFromMarket
-      : competitorFromList > 0
-      ? competitorFromList
-      : competitorFromProduct;
+ const competitorAveragePrice =
+  competitorFromList > 0
+    ? competitorFromList
+    : competitorFromMarket > 0
+    ? competitorFromMarket
+    : competitorFromProduct > 0
+    ? competitorFromProduct
+    : 0;
 
   return {
     id: product.id,
