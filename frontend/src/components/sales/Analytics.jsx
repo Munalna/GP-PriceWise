@@ -172,7 +172,8 @@ export default function Analytics({ userId }) {
                                     <Label value="Unit" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
                                 </YAxis>
                                 <Tooltip labelFormatter={(label) => label} />
-                                <Bar dataKey="quantity" fill="#7B4B94" name="Quantity Sold" radius={[6, 6, 0, 0]} />
+                                <Bar dataKey="quantity" fill="#5c008e" name="Quantity Sold" radius={[6, 6, 0, 0]} />
+                               {/* <Bar dataKey="quantity" fill="#7B4B94" name="Quantity Sold" radius={[6, 6, 0, 0]} /> */}
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
