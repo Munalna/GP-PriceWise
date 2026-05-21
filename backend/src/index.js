@@ -1,6 +1,7 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+//import dotenv from "dotenv";
 
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -13,7 +14,7 @@ import pricingRuleRoutes from "./routes/pricingRuleRoutes.js";
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5001;
