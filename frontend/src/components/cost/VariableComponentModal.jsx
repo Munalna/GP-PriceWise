@@ -120,7 +120,8 @@ const VariableComponentModal = ({ show, onHide, onSave, initialValue }) => {
       total_cost_paid: cost,
       total_quantity: Number(convertedQuantity.toFixed(4)),
       cost_per_unit: Number((cost / convertedQuantity).toFixed(6)),
-    });
+      cost: Number((cost / convertedQuantity).toFixed(6)),
+});
   };
 
   return (

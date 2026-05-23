@@ -159,6 +159,12 @@ export async function addPricingRule(req, res, next) {
 
     res.status(201).json(created);
   } catch (e) {
+    if (e?.code === "23505") {
+      return res.status(409).json({
+        message: "Pricing rule name already exists",
+      });
+    }
+
     next(e);
   }
 }
@@ -251,8 +257,14 @@ export async function editPricingRule(req, res, next) {
       return res.status(404).json({ message: "Pricing rule not found" });
     }
 
-    res.json(updated);
+      res.json(updated);
   } catch (e) {
+    if (e?.code === "23505") {
+      return res.status(409).json({
+        message: "Pricing rule name already exists",
+      });
+    }
+
     next(e);
   }
 }

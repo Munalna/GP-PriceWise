@@ -112,7 +112,10 @@ function getUniqueIds(ids = []) {
 export default function Seasons() {
   const queryClient = useQueryClient();
 
+  //const [successMsg, setSuccessMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+const [errorMsg, setErrorMsg] = useState("");
+  
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -121,6 +124,7 @@ export default function Seasons() {
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [tempSelectedRules, setTempSelectedRules] = useState([]);
   const [initialAssignedRuleIds, setInitialAssignedRuleIds] = useState([]);
+  const [rulesError, setRulesError] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -132,10 +136,10 @@ export default function Seasons() {
     return () => clearTimeout(timer);
   }, [successMsg]);
 
-  useEffect(() => {
-  if (!successMsg) return;
+ useEffect(() => {
+  if (!successMsg && !errorMsg) return;
   window.scrollTo({ top: 0, behavior: "smooth" });
-}, [successMsg]);
+}, [successMsg, errorMsg]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["seasons"] });
@@ -191,6 +195,7 @@ export default function Seasons() {
     setSelectedSeason(season);
     setTempSelectedRules(assignedRuleIds);
     setInitialAssignedRuleIds(assignedRuleIds);
+    setRulesError("");
     setShowRulesModal(true);
   };
 
@@ -199,10 +204,60 @@ export default function Seasons() {
     setSelectedSeason(null);
     setTempSelectedRules([]);
     setInitialAssignedRuleIds([]);
+    setRulesError("");
+  };
+
+  // Toggle a rule, blocking a second rule of the same type
+  const toggleRule = (rule) => {
+    setRulesError("");
+
+    const isSelected = tempSelectedRules.includes(rule.id);
+
+    // Deselect freely
+    if (isSelected) {
+      setTempSelectedRules((prev) => prev.filter((id) => id !== rule.id));
+      return;
+    }
+
+    // Prevent a second rule of the same type
+    const conflict = tempSelectedRules
+      .map((id) => pricingRules.find((r) => r.id === id))
+      .find(
+        (r) => r && normalizeRuleType(r.type) === normalizeRuleType(rule.type)
+      );
+
+    if (conflict) {
+      setRulesError(
+        `You can only assign one ${getRuleDisplayName(
+          rule.type
+        )} at a time. "${conflict.name}" is already selected — deselect it first.`
+      );
+      setTimeout(() => setRulesError(""), 4000);
+      return;
+    }
+
+    setTempSelectedRules((prev) => getUniqueIds([...prev, rule.id]));
   };
 
   const saveSeasonRules = async () => {
     if (!selectedSeason) return;
+
+    // Guard against duplicate rule types reaching the backend
+    const selectedRuleObjs = tempSelectedRules
+      .map((id) => pricingRules.find((r) => r.id === id))
+      .filter(Boolean);
+
+    const seenTypes = new Set();
+    for (const r of selectedRuleObjs) {
+      const t = normalizeRuleType(r.type);
+      if (seenTypes.has(t)) {
+        setRulesError(
+          `Duplicate ${getRuleDisplayName(r.type)} rules are not allowed.`
+        );
+        return;
+      }
+      seenTypes.add(t);
+    }
 
     try {
       const uniqueRuleIds = getUniqueIds(tempSelectedRules);
@@ -211,30 +266,42 @@ export default function Seasons() {
       await invalidate();
 
       closeRulesModal();
-      setSuccessMsg("Pricing rules assigned successfully.");
+      setSuccessMsg(
+        uniqueRuleIds.length >= 1
+          ? "Pricing rules assigned successfully."
+          : "Pricing rules cleared successfully."
+      );
     } catch (e) {
       alert(e.message || "Failed to assign rules");
     }
   };
 
-  const onSave = async ({ name, startDate, endDate }) => {
-    try {
-      if (!editing) {
-        await createSeason({ name, startDate, endDate });
-        setSuccessMsg(`"${name}" was created successfully.`);
-      } else {
-        await updateSeason(editing.id, { name, startDate, endDate });
-        setSuccessMsg(`"${name}" was updated successfully.`);
-      }
+const onSave = async ({ name, startDate, endDate }) => {
+  try {
+    setErrorMsg("");
+    setSuccessMsg("");
 
-      await invalidate();
-
-      setShowModal(false);
-      setEditing(null);
-    } catch (e) {
-      alert(e.message || "Save failed");
+    if (!editing) {
+      await createSeason({ name, startDate, endDate });
+      setSuccessMsg(`"${name}" was created successfully.`);
+    } else {
+      await updateSeason(editing.id, { name, startDate, endDate });
+      setSuccessMsg(`"${name}" was updated successfully.`);
     }
-  };
+
+    await invalidate();
+
+    setShowModal(false);
+    setEditing(null);
+  } catch (e) {
+    setSuccessMsg("");
+    setErrorMsg(
+      e?.response?.data?.message ||
+      e?.response?.data?.error ||
+      "Season name already exists."
+    );
+  }
+};
 
   const onDeleteConfirmed = async () => {
     if (!deleteTarget) return;
@@ -280,11 +347,11 @@ export default function Seasons() {
         </div>
       )}
 
-      {error && (
-        <div style={styles.errorBox}>
-          <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
-        </div>
-      )}
+      {(error || errorMsg) && (
+  <div style={styles.errorBox}>
+    <span>{errorMsg || error}</span>
+  </div>
+)}
 
       <div style={styles.card}>
         {loading ? (
@@ -405,13 +472,15 @@ export default function Seasons() {
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0 }}>
+              <h3 style={styles.modalTitle}>
                 Assign Rules to {selectedSeason.name}
               </h3>
               <button style={styles.closeBtn} onClick={closeRulesModal} type="button">
                 ✕
               </button>
             </div>
+
+            {rulesError && <div style={styles.formError}>{rulesError}</div>}
 
             <div style={styles.rulesList}>
               {pricingRules.length > 0 ? (
@@ -430,15 +499,7 @@ export default function Seasons() {
                         wasAlreadyAssigned,
                         willBeRemoved
                       )}
-                      onClick={() => {
-                        setTempSelectedRules((prev) => {
-                          if (prev.includes(rule.id)) {
-                            return prev.filter((id) => id !== rule.id);
-                          }
-
-                          return getUniqueIds([...prev, rule.id]);
-                        });
-                      }}
+                      onClick={() => toggleRule(rule)}
                     >
                       <input type="checkbox" checked={isSelected} readOnly />
 
@@ -480,7 +541,7 @@ export default function Seasons() {
                 onClick={saveSeasonRules}
                 type="button"
               >
-                Assign Rules
+                {tempSelectedRules.length >= 1 ? "Assign Rules" : "Save"}
               </button>
             </div>
           </div>
@@ -529,9 +590,9 @@ function SeasonModal({ initial, onClose, onSave }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.modalHeader}>
-          <h3 style={{ margin: 0 }}>
-            {initial?.id ? "Update Season" : "Create Season"}
-          </h3>
+         <h3 style={styles.formTitle}>
+  {initial?.id ? "Edit Season" : "Add Season"}
+</h3>
           <button style={styles.closeBtn} onClick={onClose} type="button">
             ✕
           </button>
@@ -749,13 +810,36 @@ iconBtn: {
     borderRadius: 16,
     padding: 18,
     boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+    maxHeight: "90vh",
+    display: "flex",
+    flexDirection: "column",
   },
   modalHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
+    flexShrink: 0,
+    gap: 12,
   },
+  modalTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 900,
+    color: "#382372",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    minWidth: 0,
+  },
+
+  formTitle: {
+  margin: 0,
+  fontSize: 30,
+  fontWeight: 800,
+  color: "#111827",
+},
+
   closeBtn: {
     border: "none",
     background: "#eef2f7",
@@ -770,6 +854,11 @@ iconBtn: {
     flexDirection: "column",
     gap: 10,
     marginTop: 12,
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    paddingRight: 4,
+    paddingBottom: 4,
   },
   ruleOption: (isSelected, wasAlreadyAssigned, willBeRemoved) => ({
     display: "flex",
@@ -848,6 +937,9 @@ iconBtn: {
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 16,
+    paddingTop: 14,
+    borderTop: "1px solid #eef2f7",
+    flexShrink: 0,
   },
 
   successBox: {
