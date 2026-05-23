@@ -139,7 +139,7 @@ useEffect(() => {
     try { return JSON.parse(compData); } catch (e) { return []; }
   };
 
- const handleAnalyzePricing = async (productId) => {
+const handleAnalyzePricing = async (productId, product) => {
   setRiskLoading(true);
   setRiskResult(null);
   setError("");
@@ -147,6 +147,24 @@ useEffect(() => {
 
   try {
     const result = await getAIPriceRecommendation(productId);
+
+    console.log("DEBUG competitor:", {
+  product_name: product?.name,
+  product_competitors_prices: product?.competitors_prices,
+  frontend_calc: product ? calculateAvg(product.competitors_prices) : "no product",
+  backend_market: result.data?.market,
+});
+
+    // Fallback: if backend returns 0 for competitor average,
+    // use the same value the table shows (from competitors_prices).
+    const backendAvg = Number(result.data?.market?.competitor_average_price) || 0;
+    const frontendAvg = product
+      ? Number(calculateAvg(product.competitors_prices))
+      : 0;
+
+    if (result.data?.market && backendAvg === 0 && frontendAvg > 0) {
+      result.data.market.competitor_average_price = frontendAvg;
+    }
 
     setRiskResult(result.data);
 
@@ -360,7 +378,7 @@ const handleSaveRules = async () => {
       rules: tempSelectedRules,
     });
 
-    if (selectedProduct) await handleAnalyzePricing(selectedProduct.id);
+  if (selectedProduct) await handleAnalyzePricing(selectedProduct.id, selectedProduct);
 
     setShowRulesModal(false);
 
@@ -753,7 +771,7 @@ const componentHelpText =
           style={actionBtnPurple}
           disabled={riskLoading}
           title="Analyze Pricing"
-          onClick={() => handleAnalyzePricing(prod.id)}
+         onClick={() => handleAnalyzePricing(prod.id, prod)}
         >
           <ChartColumnDecreasing size={16} />
         </button>
@@ -819,10 +837,11 @@ const componentHelpText =
           )}
         </>
       )}
+      
 {showRiskModal && (
   <div style={modalOverlay}>
     <div style={riskModalContent}>
-      <h2 style={modalTitleCustom}>Pricing Risk Analysis</h2>
+      <h2 style={modalTitleCustom}>Pricing Analysis</h2>
 
       {riskLoading && (
         <div style={riskLoadingBox}>
@@ -840,9 +859,6 @@ const componentHelpText =
         <>
           <div style={riskHeaderBox}>
             <h3 style={riskProductName}>{riskResult.product.name}</h3>
-            <span style={riskScoreBadge}>
-              Risk Score: {riskResult.analysis.risk_score}
-            </span>
           </div>
 
           {riskResult.ai && (
@@ -853,36 +869,18 @@ const componentHelpText =
             </div>
           )}
 
-          <div style={riskGrid}>
-            <div style={riskCard}>
-              <strong>Pricing Health</strong>
-              <p>{riskResult.analysis.pricing_health}</p>
-            </div>
-
-            <div style={riskCard}>
-              <strong>Risk Label</strong>
-              <p>{riskResult.analysis.risk_label}</p>
-            </div>
-
-            <div style={riskCard}>
-              <strong>Market Comparison</strong>
-              <p>{riskResult.analysis.market_comparison}</p>
-            </div>
-
-            <div style={riskCard}>
-              <strong>Profit Impact</strong>
-              <p>{riskResult.analysis.profit_impact}</p>
-            </div>
+          <div style={{ ...riskCard, marginBottom: "20px" }}>
+            <strong>Risk Label</strong>
+            <p>{riskResult.analysis.risk_label}</p>
           </div>
 
           <div style={riskDetailsBox}>
             <p><strong>Current Price:</strong> {formatNum(riskResult.product.current_price)} SAR</p>
-<p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
-<p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
-<p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
-<p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p>
-<p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
-           
+            <p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
+            <p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
+            <p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
+          {/* <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p> */}
+            <p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
           </div>
 
           <div style={insightBox}>
@@ -891,22 +889,10 @@ const componentHelpText =
           </div>
 
           {riskResult.ai ? (
-            <>
-              <div style={insightBox}>
-                <strong>AI Risk Explanation</strong>
-                <p>{riskResult.ai.risk_explanation}</p>
-              </div>
-
-              <div style={insightBox}>
-                <strong>AI Margin Safety</strong>
-                <p>{riskResult.ai.margin_safety_explanation}</p>
-              </div>
-
-              <div style={insightBox}>
-                <strong>AI Recommended Action</strong>
-                <p>{riskResult.ai.action}</p>
-              </div>
-            </>
+            <div style={insightBox}>
+              <strong>AI Recommended Action</strong>
+              <p>{riskResult.ai.action}</p>
+            </div>
           ) : (
             <div style={insightBox}>
               <strong>Recommendation</strong>
@@ -1461,7 +1447,7 @@ const componentHelpText =
 
               <div style={inputGroup}>
                 <label style={labelStyle}>
-  Current Price (SAR) <span style={requiredStar}>*</span>
+  Current Price (SAR)
 </label>
                 <input
                   type="text"
