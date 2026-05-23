@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase.js";
+import { supabase, supabaseAdmin } from "../config/supabase.js";
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -21,6 +21,101 @@ function logSupabaseError(context, error, metadata = {}) {
     hint: error.hint,
     metadata,
   });
+}
+
+function toNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function getMonthlyFixedCostAmount(cost) {
+  const amount = toNumber(cost?.amount, 0);
+  const period = String(cost?.period || "Monthly").trim().toLowerCase();
+
+  if (period === "quarterly") return amount / 3;
+  if (period === "yearly") return amount / 12;
+
+  return amount;
+}
+
+function getInclusiveDateSpanDays(rows = []) {
+  const timestamps = rows
+    .map((row) => {
+      const date = row?.sale_date ? new Date(row.sale_date) : null;
+      return date && !Number.isNaN(date.getTime()) ? date.getTime() : null;
+    })
+    .filter((timestamp) => timestamp !== null);
+
+  if (timestamps.length === 0) return 0;
+
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  return Math.max(1, Math.round((maxTime - minTime) / dayMs) + 1);
+}
+
+async function getFixedCostAllocationContext(userId) {
+  const db = supabaseAdmin || supabase;
+
+  const [fixedCostsResult, salesResult] = await Promise.all([
+    db
+      .from("fixed_costs")
+      .select("amount, period")
+      .eq("owner_id", userId),
+    db
+      .from("sales_data")
+      .select("quantity, sale_date")
+      .eq("user_id", userId),
+  ]);
+
+  if (fixedCostsResult.error) {
+    logSupabaseError("getFixedCostAllocation.fixedCosts", fixedCostsResult.error, {
+      userId,
+    });
+    throw fixedCostsResult.error;
+  }
+
+  if (salesResult.error) {
+    logSupabaseError("getFixedCostAllocation.sales", salesResult.error, {
+      userId,
+    });
+    throw salesResult.error;
+  }
+
+  const fixedCosts = fixedCostsResult.data || [];
+  const salesRows = salesResult.data || [];
+
+  const totalMonthlyFixedCosts = fixedCosts.reduce(
+    (sum, cost) => sum + getMonthlyFixedCostAmount(cost),
+    0
+  );
+
+  const totalUnitsInImport = salesRows.reduce(
+    (sum, row) => sum + toNumber(row.quantity, 0),
+    0
+  );
+
+  const salesPeriodDays = getInclusiveDateSpanDays(salesRows);
+  const estimatedMonthlyUnits =
+    totalUnitsInImport > 0 && salesPeriodDays > 0
+      ? totalUnitsInImport * (30 / salesPeriodDays)
+      : 0;
+
+  const fixedCostShare =
+    totalMonthlyFixedCosts > 0 && estimatedMonthlyUnits > 0
+      ? totalMonthlyFixedCosts / estimatedMonthlyUnits
+      : 0;
+
+  return {
+    total_monthly_fixed_costs: Number(totalMonthlyFixedCosts.toFixed(2)),
+    sales_units_in_import: Number(totalUnitsInImport.toFixed(2)),
+    sales_period_days: salesPeriodDays,
+    estimated_monthly_units: Number(estimatedMonthlyUnits.toFixed(2)),
+    fixed_cost_share_per_unit: Number(fixedCostShare.toFixed(2)),
+    fixed_cost_allocation_applied:
+      totalMonthlyFixedCosts > 0 && estimatedMonthlyUnits > 0,
+  };
 }
 
 // جلب البيانات مع دمج الجداول لضمان حساب المتوسط + جلب الرولز المرتبطة
@@ -78,6 +173,8 @@ export const getAllProducts = async (userId) => {
   const marketData1 = res1.data || [];
   const marketData2 = res2.data || [];
   const assignments = assignmentsRes.data || [];
+  const fixedCostAllocation = await getFixedCostAllocationContext(userId);
+  const fixedCostShare = fixedCostAllocation.fixed_cost_share_per_unit;
 
   const sourceCategories = [...(categories || [])];
 
@@ -137,6 +234,8 @@ export const getAllProducts = async (userId) => {
           ...prod,
           competitors_prices: allRelatedPrices,
           rules: productRules,
+          fixed_cost_share: fixedCostShare,
+          fixed_cost_allocation: fixedCostAllocation,
         };
       }),
     };

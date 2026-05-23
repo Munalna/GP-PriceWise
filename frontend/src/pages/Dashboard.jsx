@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Container, Spinner } from 'react-bootstrap';
+import { Alert, Spinner } from 'react-bootstrap';
 import ImportSales from '../components/sales/ImportSales';
 import Analytics from '../components/sales/Analytics';
 import { useAuth } from '../context/AuthContext';
@@ -24,19 +24,20 @@ export default function Dashboard() {
 
     if (!user) {
         return (
-            <Alert variant="danger">
-                Sorry, you must login first to access this page.
-            </Alert>
+            <div className="dashboard-page">
+                <Alert variant="danger" className="dashboard-alert">
+                    Sorry, you must login first to access this page.
+                </Alert>
+            </div>
         );
     }
 
     return (
-        <Container fluid className="dashboard-page p-0">
+        <div className="dashboard-page">
             <div className="dashboard-header">
                 <div>
-                    <p className="dashboard-eyebrow">Sales workspace</p>
-                    <h2 className="page-title mb-1">Dashboard & Sales</h2>
-                    <p className="dashboard-subtitle mb-0">
+                    <h2 className="dashboard-title">Dashboard & Sales</h2>
+                    <p className="dashboard-subtitle">
                         Import POS files and review product movement in one place.
                     </p>
                 </div>
@@ -52,6 +53,6 @@ export default function Dashboard() {
             <section className="dashboard-card">
                 <Analytics key={refreshTrigger} userId={user.id} />
             </section>
-        </Container>
+        </div>
     );
 }

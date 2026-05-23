@@ -1,5 +1,6 @@
 import React from 'react';
 import Sidebar from './Sidebar';
+import Chatbot from '../common/Chatbot';
 import './Layout.css';
 
 const MainLayout = ({ children }) => {
@@ -9,6 +10,7 @@ const MainLayout = ({ children }) => {
       <div className="main-content">
         {children}
       </div>
+      <Chatbot />
     </div>
   );
 };

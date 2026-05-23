@@ -1,7 +1,8 @@
-import "dotenv/config";
 import express from "express";
 import cors from "cors";
-//import dotenv from "dotenv";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -10,16 +11,25 @@ import reportRoutes from "./routes/reportRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import salesDataRoutes from "./routes/salesDataRoutes.js";
 import pricingRuleRoutes from "./routes/pricingRuleRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+app.options("*", cors());
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -37,13 +47,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sales-data", salesDataRoutes);
 app.use("/api/salesData", salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.options('*', cors()); // handle preflight requests
+app.use("/api/chatbot", chatbotRoutes);
 
 app.use(errorHandler);
 

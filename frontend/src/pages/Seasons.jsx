@@ -42,8 +42,7 @@ function getSeasonStatus(season) {
 
 const STATUS_CONFIG = {
   active: { label: "Active", bg: "#1f9d55" },
-  passed: { label: "Passed", bg: "#914d16" },
- passed: { label: "Passed", bg: "#656a74" },
+  passed: { label: "Passed", bg: "#656a74" },
   //passed: { label: "Passed", bg: "#b45309" },
   upcoming: { label: "Upcoming", bg: "#b45309" },
   //upcoming: { label: "Upcoming", bg: "#451991" },
@@ -113,7 +112,6 @@ function getUniqueIds(ids = []) {
 export default function Seasons() {
   const queryClient = useQueryClient();
 
-  const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   const [showModal, setShowModal] = useState(false);
@@ -142,7 +140,11 @@ export default function Seasons() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["seasons"] });
 
-  const { data: seasons = [], isLoading: loading } = useQuery({
+  const {
+    data: seasons = [],
+    isLoading: loading,
+    error: seasonsError,
+  } = useQuery({
     queryKey: ["seasons"],
     queryFn: async () => {
       const data = await fetchSeasons();
@@ -151,11 +153,13 @@ export default function Seasons() {
     staleTime: 1000 * 60 * 60, // 1 hour
   });
 
-  const { data: pricingRules = [] } = useQuery({
+  const { data: pricingRules = [], error: pricingRulesError } = useQuery({
     queryKey: ["pricingRules"],
     queryFn: () => fetchPricingRules().then((d) => (Array.isArray(d) ? d : [])),
     staleTime: 1000 * 60 * 60, // 1 hour
   });
+
+  const error = seasonsError?.message || pricingRulesError?.message || "";
 
   // Sort: Active → Upcoming → Passed, then by start date within each group
   const sortedSeasons = useMemo(() => {

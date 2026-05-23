@@ -9,7 +9,6 @@ import { CiLink, CiEdit } from "react-icons/ci";
 import { FaRegTrashAlt } from "react-icons/fa";
 import { RiAlertLine } from "react-icons/ri";
 
-const API_URL = "/api/products";
 function Products() {
   const { user } = useAuth();
   const userId = user?.id;
@@ -22,7 +21,9 @@ const { data: categories = [], isLoading: loadingCats } = useQuery({
   queryKey: ["products", userId],
  queryFn: () => api.get("/products").then((r) => Array.isArray(r.data) ? r.data : []),
   enabled: !!userId,
-  staleTime: 1000 * 60 * 60,
+  staleTime: 0,
+  refetchOnMount: "always",
+  refetchOnWindowFocus: true,
 });
 
 const { data: varComponents = [], isLoading: loadingVC } = useQuery({
@@ -41,13 +42,13 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
 
   const loading = loadingCats || loadingVC;
 
-const categoryRefs = React.useRef({});
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
   const [riskResult, setRiskResult] = useState(null);
   const [showRiskModal, setShowRiskModal] = useState(false);
   const [aiRecommendedPrices, setAiRecommendedPrices] = useState({});
+  const [analyzedBaseCosts, setAnalyzedBaseCosts] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -174,6 +175,15 @@ const handleAnalyzePricing = async (productId, product) => {
         [productId]: result.data.ai.recommended_price,
       }));
     }
+
+    if (result.data?.cost?.base_cost !== undefined) {
+      setAnalyzedBaseCosts((prev) => ({
+        ...prev,
+        [productId]: result.data.cost.base_cost,
+      }));
+    }
+
+    invalidate();
   } catch (err) {
     setError(
       err.response?.data?.message ||
@@ -465,14 +475,6 @@ const handleDeleteCategory = async () => {
   return comp?.unit || "";
 };
 
-const getComponentCostPerUnit = (name) => {
-  const comp = varComponents.find((c) => c.name === name);
-  return Number(comp?.cost_per_unit || 0);
-};
-
-const componentHelpText =
-  "Select the ingredients used in ONE product recipe, then enter the amount used. Example: 180 ml milk, 18 gram coffee beans, 15 ml syrup, 1 cup.";
-
   return (<div style={pageContainer}>
   <div style={headerStyle}>
     <div>
@@ -678,6 +680,10 @@ const componentHelpText =
                     <tbody>
                      {[...cat.products].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((prod) => {
                         const comps = parseComponents(prod.components);
+                        const variableCost = calculateTotalVcost(comps);
+                        const fixedCostShare = Number(prod.fixed_cost_share) || 0;
+                        const displayedBaseCost =
+                          analyzedBaseCosts[prod.id] ?? variableCost + fixedCostShare;
                         return (
                           <tr key={prod.id}>
                             <td style={tdStyle}>
@@ -722,9 +728,9 @@ const componentHelpText =
                             </td>
 
                             <td style={tdStyle}>
-                              {formatNum(calculateTotalVcost(comps))} SAR
+                              {formatNum(variableCost)} SAR
                             </td>
-                            <td style={tdStyle}>{formatNum(prod.b_cost)} SAR</td>
+                            <td style={tdStyle}>{formatNum(displayedBaseCost)} SAR</td>
                             <td style={tdStyle}>{formatNum(prod.c_price)} SAR</td>
                             <td
                               style={{
@@ -878,6 +884,15 @@ const componentHelpText =
             <p><strong>Current Price:</strong> {formatNum(riskResult.product.current_price)} SAR</p>
             <p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
             <p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
+            <p><strong>Fixed Cost Share:</strong> {formatNum(riskResult.cost.fixed_cost_share || 0)} SAR</p>
+            {!riskResult.cost.fixed_cost_allocation?.fixed_cost_allocation_applied && (
+              <p style={{ color: "#92400e", fontWeight: 700 }}>
+                Fixed cost allocation not applied. Import sales data to allocate fixed costs automatically.
+              </p>
+            )}
+            {riskResult.cost.price_floor !== undefined && (
+              <p><strong>Price Floor:</strong> {formatNum(riskResult.cost.price_floor)} SAR</p>
+            )}
             <p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
           {/* <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p> */}
             <p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
@@ -1786,16 +1801,6 @@ const draftWarningBadge = {
   padding: "5px 8px",
 };
 
-const compBadgeStyle = {
-  backgroundColor: "#f1f2f6",
-  color: "#555",
-  fontSize: "11px",
-  padding: "3px 8px",
-  borderRadius: "12px",
-  fontWeight: "500",
-  border: "1px solid #e1e2e6",
-};
-
 const prodNameText = {
   fontWeight: "600",
   color: "#2d1b4e",
@@ -2019,29 +2024,6 @@ const compSelectionGrid = {
   overflowY: "auto",
 };
 
-const compItemWrapper = {
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-};
-
-const baseCompBox = {
-  padding: "8px 15px",
-  borderRadius: "8px",
-  fontSize: "14px",
-  cursor: "pointer",
-  transition: "0.2s",
-  fontWeight: "500",
-  border: "1px solid #ddd",
-};
-
-const activeCompBox = {
-  ...baseCompBox,
-  backgroundColor: "#5b2d89",
-  color: "white",
-  borderColor: "#5b2d89",
-};
-
 const recipeRowMini = {
   display: "flex",
   justifyContent: "space-between",
@@ -2095,21 +2077,6 @@ const removeRecipeChipBtn = {
   fontWeight: "900",
 };
 
-const inactiveCompBox = {
-  ...baseCompBox,
-  backgroundColor: "#f9f9f9",
-  color: "#777",
-};
-
-const qtyInputSmall = {
-  width: "55px",
-  padding: "6px",
-  borderRadius: "6px",
-  border: "2px solid #5b2d89",
-  textAlign: "center",
-  fontWeight: "bold",
-};
-
 const ruleCardStyle = (isSelected) => ({
   display: "flex",
   alignItems: "center",
@@ -2134,22 +2101,6 @@ const riskProductName = {
   margin: 0,
   color: "#2d1b4e",
   fontSize: "22px",
-};
-
-const riskScoreBadge = {
-  backgroundColor: "#5b2d89",
-  color: "white",
-  padding: "8px 14px",
-  borderRadius: "20px",
-  fontWeight: "bold",
-  fontSize: "13px",
-};
-
-const riskGrid = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "15px",
-  marginBottom: "20px",
 };
 
 const riskCard = {
@@ -2222,17 +2173,6 @@ const selectedComponentsBox = {
   alignItems: "center",
 };
 
-const selectedComponentChip = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  backgroundColor: "#5b2d89",
-  color: "white",
-  padding: "8px 10px",
-  borderRadius: "10px",
-  fontWeight: "600",
-};
-
 const helpIcon = {
   marginLeft: "6px",
   backgroundColor: "#eee",
@@ -2261,21 +2201,6 @@ const tooltipBox = {
   lineHeight: 1.6,
   zIndex: 10000,
   transition: "opacity 0.2s ease",
-};
-
-const removeChipBtn = {
-  border: "none",
-  backgroundColor: "transparent",
-  color: "white",
-  fontSize: "18px",
-  cursor: "pointer",
-  lineHeight: "1",
-};
-
-const competitorPriceHint = {
-  position: "relative",
-  cursor: "help",
-  fontWeight: "700",
 };
 
 const competitorZeroHint = {
@@ -2341,12 +2266,6 @@ const recipeUnitText = {
 const requiredStar = {
   color: "#e74c3c",
   fontWeight: "bold",
-};
-
-const inlineAlertStyle = {
-  marginBottom: "16px",
-  borderRadius: "10px",
-  fontWeight: "600",
 };
 
 const riskLoadingBox = {

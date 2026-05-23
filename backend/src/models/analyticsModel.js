@@ -6,6 +6,7 @@ const PRODUCT_COMPONENTS_TABLE = "product_components";
 const MARKET_TABLE = "marketdataset";
 const PRICING_RULE_ASSIGNMENTS_TABLE = "pricing_rule_assignments";
 const SEASONS_TABLE = "seasons";
+const FIXED_COSTS_TABLE = "fixed_costs";
 
 export async function checkProductInMarketDataset(productName) {
   const db = getDbClient();
@@ -52,6 +53,33 @@ function getAverage(numbers = []) {
 
   const total = validNumbers.reduce((sum, num) => sum + num, 0);
   return total / validNumbers.length;
+}
+
+function getMonthlyFixedCostAmount(cost) {
+  const amount = toNumber(cost?.amount, 0);
+  const period = String(cost?.period || "Monthly").trim().toLowerCase();
+
+  if (period === "quarterly") return amount / 3;
+  if (period === "yearly") return amount / 12;
+
+  return amount;
+}
+
+function getInclusiveDateSpanDays(rows = []) {
+  const timestamps = rows
+    .map((row) => {
+      const date = row?.sale_date ? new Date(row.sale_date) : null;
+      return date && !Number.isNaN(date.getTime()) ? date.getTime() : null;
+    })
+    .filter((timestamp) => timestamp !== null);
+
+  if (timestamps.length === 0) return 0;
+
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  return Math.max(1, Math.round((maxTime - minTime) / dayMs) + 1);
 }
 
 function parseJsonArray(value) {
@@ -359,6 +387,58 @@ export async function getSeasonPricingRules(userId, seasonId) {
   return data || [];
 }
 
+export async function getFixedCostAllocationContext(userId) {
+  const db = getDbClient();
+
+  const [fixedCostsResult, salesResult] = await Promise.all([
+    db
+      .from(FIXED_COSTS_TABLE)
+      .select("amount, period")
+      .eq("owner_id", userId),
+    db
+      .from(SALES_TABLE)
+      .select("quantity, sale_date")
+      .eq("user_id", userId),
+  ]);
+
+  if (fixedCostsResult.error) throw fixedCostsResult.error;
+  if (salesResult.error) throw salesResult.error;
+
+  const fixedCosts = fixedCostsResult.data || [];
+  const salesRows = salesResult.data || [];
+
+  const totalMonthlyFixedCosts = fixedCosts.reduce(
+    (sum, cost) => sum + getMonthlyFixedCostAmount(cost),
+    0
+  );
+
+  const totalUnitsInImport = salesRows.reduce(
+    (sum, row) => sum + toNumber(row.quantity, 0),
+    0
+  );
+
+  const salesPeriodDays = getInclusiveDateSpanDays(salesRows);
+  const estimatedMonthlyUnits =
+    totalUnitsInImport > 0 && salesPeriodDays > 0
+      ? totalUnitsInImport * (30 / salesPeriodDays)
+      : 0;
+
+  const fixedCostShare =
+    totalMonthlyFixedCosts > 0 && estimatedMonthlyUnits > 0
+      ? totalMonthlyFixedCosts / estimatedMonthlyUnits
+      : 0;
+
+  return {
+    total_monthly_fixed_costs: Number(totalMonthlyFixedCosts.toFixed(2)),
+    sales_units_in_import: Number(totalUnitsInImport.toFixed(2)),
+    sales_period_days: salesPeriodDays,
+    estimated_monthly_units: Number(estimatedMonthlyUnits.toFixed(2)),
+    fixed_cost_share_per_unit: Number(fixedCostShare.toFixed(2)),
+    fixed_cost_allocation_applied:
+      totalMonthlyFixedCosts > 0 && estimatedMonthlyUnits > 0,
+  };
+}
+
 export async function buildProductPricingAnalysisInput(userId, productId) {
   const product = await getProductById(userId, productId);
 
@@ -372,12 +452,14 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     marketResult,
     assignedRules,
     activeSeason,
+    fixedCostAllocation,
   ] = await Promise.all([
     getProductComponentsCost(product.id),
     getVariableComponentsCostFromProductText(userId, product.components),
     getMarketPricesByProductName(product.name, categoryName),
     getAssignedPricingRules(userId, product.id, product.category_id),
     getActiveSeason(userId),
+    getFixedCostAllocationContext(userId),
   ]);
 
   const seasonRules = await getSeasonPricingRules(userId, activeSeason?.id);
@@ -398,6 +480,10 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
 
   const allRules = [...productRules, ...categoryRules, ...activeSeasonRules];
 
+  const minimumMarginRule = allRules.find(
+    (rule) => String(rule?.type || "").toLowerCase() === "minimum margin"
+  );
+
   const targetMarginRule = allRules.find((rule) =>
     ["minimum margin", "profit margin"].includes(
       String(rule?.type || "").toLowerCase()
@@ -411,7 +497,12 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
 
   const totalComponentCost = toNumber(componentCostResult.total_component_cost, 0);
   const storedBaseCost = toNumber(product.b_cost, 0);
-  const baseCost = totalComponentCost > 0 ? totalComponentCost : storedBaseCost;
+  const baseCost = totalComponentCost;
+  const fixedCostShare = toNumber(
+    fixedCostAllocation.fixed_cost_share_per_unit,
+    0
+  );
+  const pricingCost = baseCost + fixedCostShare;
   const currentPrice = toNumber(product.c_price, 0);
 
   const competitorFromMarket = toNumber(marketResult.average_market_price, 0);
@@ -438,6 +529,8 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     current_price: currentPrice,
     base_cost: baseCost,
     component_cost: totalComponentCost,
+    fixed_cost_share: fixedCostShare,
+    pricing_cost: pricingCost,
     stored_base_cost: storedBaseCost,
 
     competitor_average_price: competitorAveragePrice,
@@ -450,6 +543,9 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     target_margin: targetMarginRule
       ? toNumber(targetMarginRule.value, null)
       : null,
+    minimum_margin: minimumMarginRule
+      ? toNumber(minimumMarginRule.value, 0)
+      : 0,
 
     season: activeSeason?.season_name || "Unknown",
     active_season: activeSeason || null,
@@ -459,6 +555,7 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     season_rules: activeSeasonRules,
 
     fixed_variable_cost_ratio: 0,
+    fixed_cost_allocation: fixedCostAllocation,
 
     components: componentCostResult.components,
     market_rows: marketResult.market_rows,
