@@ -10,26 +10,102 @@ const FIXED_COSTS_TABLE = "fixed_costs";
 
 export async function checkProductInMarketDataset(productName) {
   const db = getDbClient();
-
-  const normalizedName = productName.trim().toLowerCase();
+  const anchor = getNameAnchor(productName);
 
   const { data, error } = await db
     .from("marketdataset")
     .select("itemname, price")
-    .limit(100);
+    .ilike("itemname", `%${anchor}%`)
+    .limit(200);
 
   if (error) throw error;
 
-  const matches = (data || []).filter((row) => {
-    const itemName = String(row.itemname || "").trim().toLowerCase();
-    return itemName === normalizedName;
-  });
-
-  return {
-    exists: matches.length > 0,
-    matches,
-  };
+  const matches = (data || []).filter(
+  (row) =>
+    hasImportantTokenOverlap(row.itemname, productName) &&
+    marketNameSimilarity(row.itemname, productName) >= MARKET_MATCH_THRESHOLD
+);
+  return { exists: matches.length > 0, matches };
 }
+
+/* ---- Fuzzy market-name matching helpers ---- */
+function normalizeMarketName(s = "") {
+  return String(s)
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove diacritics
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s]/g, " ")   // strip punctuation
+    .replace(/\bice\b/g, "iced")     // ice -> iced
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w)) // singular/plural
+    .sort()                           // ignore word order
+    .join(" ");
+}
+
+function levenshteinRatio(a = "", b = "") {
+  const m = a.length, n = b.length;
+  if (m === 0 || n === 0) return m === n ? 1 : 0;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+  return 1 - d[m][n] / Math.max(m, n);
+}
+
+function marketNameSimilarity(a, b) {
+  const x = normalizeMarketName(a);
+  const y = normalizeMarketName(b);
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+  const sx = new Set(x.split(" "));
+  const sy = new Set(y.split(" "));
+  const inter = [...sx].filter((t) => sy.has(t)).length;
+  const union = new Set([...sx, ...sy]).size;
+  const jaccard = union ? inter / union : 0; // tolerates extra words
+  return Math.max(jaccard, levenshteinRatio(x, y)); // + tolerates typos
+}
+
+function getNameAnchor(name) {
+  const tokens = normalizeMarketName(name).split(" ").filter(Boolean);
+  if (tokens.length === 0) return String(name || "").trim();
+  return tokens.sort((a, b) => b.length - a.length)[0]; // longest = key word
+}
+
+
+function hasImportantTokenOverlap(a, b) {
+  const stopWords = new Set([
+    "hot",
+    "iced",
+    "ice",
+    "drink",
+    "coffee",
+  ]);
+  const ax = normalizeMarketName(a)
+    .split(" ")
+    .filter((t) => !stopWords.has(t));
+  const bx = normalizeMarketName(b)
+    .split(" ")
+    .filter((t) => !stopWords.has(t));
+  const overlap = ax.filter((token) => bx.includes(token));
+  // If product names are short, allow 1 strong overlap
+  if (Math.min(ax.length, bx.length) <= 2) {
+    return overlap.length >= 1;
+  }
+  // Longer names require stronger overlap
+  return overlap.length >= 2;
+}
+
+const MARKET_MATCH_THRESHOLD = 0.7; // 0.5–0.7 to tune strictness
+
+
 
 function getDbClient() {
   if (!supabaseAdmin) {
@@ -276,23 +352,33 @@ export async function getProductComponentsCost(productId) {
 
 export async function getMarketPricesByProductName(productName, categoryName) {
   const db = getDbClient();
+  const anchor = getNameAnchor(productName); // e.g. "Iced Matcha Latte" -> "matcha"
 
-  let query = db
-    .from(MARKET_TABLE)
-    .select(
-      "productid, restaurantname, location, itemname, category, price, source, scrapedat"
-    )
-    .ilike("itemname", `%${productName}%`);
+  const fetchCandidates = async (useCategory) => {
+    let query = db
+      .from(MARKET_TABLE)
+      .select(
+        "productid, restaurantname, location, itemname, category, price, source, scrapedat"
+      )
+      .ilike("itemname", `%${anchor}%`); // loose DB pre-filter on the key word
 
-  if (categoryName && categoryName !== "Unknown") {
-    query = query.ilike("category", `%${categoryName}%`);
-  }
+    if (useCategory && categoryName && categoryName !== "Unknown") {
+      query = query.ilike("category", `%${categoryName}%`);
+    }
 
-  const { data, error } = await query.limit(30);
+    const { data, error } = await query.limit(200);
+    if (error) throw error;
+   return (data || []).filter(
+  (row) =>
+    marketNameSimilarity(row.itemname, productName) >= MARKET_MATCH_THRESHOLD &&
+    hasImportantTokenOverlap(row.itemname, productName)
+);
+  };
 
-  if (error) throw error;
+  // try with category first, then without if it filtered everything out
+  let marketRows = await fetchCandidates(true);
+  if (marketRows.length === 0) marketRows = await fetchCandidates(false);
 
-  const marketRows = data || [];
   const prices = marketRows
     .map((row) => toNumber(row.price, 0))
     .filter((price) => price > 0);

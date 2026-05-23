@@ -838,6 +838,8 @@ const handleDeleteCategory = async () => {
         setModalError("");
         setEditCatName("");
         setShowEditCategoryInput(false);
+        setMarketCheck(null);                 // clear any leftover from Add
+  handleCheckMarketProduct(prod.name);  // show market status for current name
         setShowEditModal(true);
       }}
     >
@@ -1376,6 +1378,7 @@ const handleDeleteCategory = async () => {
                 onClick={() => {
                   setShowAddModal(false);
                   setModalError("");
+                  setMarketCheck(null);   // add
                 }}
               >
                 Cancel
@@ -1429,21 +1432,36 @@ const handleDeleteCategory = async () => {
             )}
 
             <div style={gridTwoCols}>
-              <div style={inputGroup}>
-                <label style={labelStyle}>
-  Product Name <span style={requiredStar}>*</span>
-</label>
-                <input
-                  style={inputFieldCustom}
-                  value={selectedProduct.name}
-                  onChange={(e) =>
-                    setSelectedProduct({
-                      ...selectedProduct,
-                      name: e.target.value,
-                    })
-                  }
-                />
-              </div>
+       <div style={inputGroup}>
+  <label style={labelStyle}>
+    Product Name <span style={requiredStar}>*</span>
+  </label>
+  <input
+    style={inputFieldCustom}
+    value={selectedProduct.name}
+    onChange={(e) => {
+      const value = e.target.value;
+      setSelectedProduct({ ...selectedProduct, name: value });
+      handleCheckMarketProduct(value);
+    }}
+  />
+
+  {marketCheck && (
+    <div
+      style={{
+        color: marketCheck.exists ? "#27ae60" : "#e67e22",
+        fontSize: "13px",
+        fontWeight: "600",
+        marginTop: "-8px",
+        marginBottom: "12px",
+      }}
+    >
+      {marketCheck.exists
+        ? "✅ Market data found for this product."
+        : "⚠️ No market data found. Competitor average may be 0 SAR."}
+    </div>
+  )}
+</div>
 
 <div style={inputGroup}>
   <label style={labelStyle}>
@@ -1612,6 +1630,7 @@ const handleDeleteCategory = async () => {
                   setModalError("");
                   setEditCatName("");
                   setShowEditCategoryInput(false);
+                  setMarketCheck(null);   // add
                 }}
               >
                 Cancel
