@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChartColumnDecreasing } from "lucide-react";
-import { CiLink, CiEdit } from "react-icons/ci";
+import { CiEdit } from "react-icons/ci";
 import { FaRegTrashAlt } from "react-icons/fa";
 import { RiAlertLine } from "react-icons/ri";
 import {
@@ -12,6 +11,16 @@ import {
 } from "../services/pricingRuleService";
 
 const RULE_TYPE_CONFIG = {
+  "minimum margin": {
+    label: "Minimum Margin Protection",
+    valueLabel: "Minimum Required Margin (%)",
+    unit: "%",
+    inputType: "number",
+    defaultValue: 30,
+    placeholder: "e.g., 30",
+    helperText:
+      "Sets the price floor used to cover fixed costs and minimum profit.",
+  },
   "profit margin": {
     label: "Profit Margin Rule",
     valueLabel: "Target Profit Margin (%)",
@@ -105,7 +114,10 @@ function formatRuleValue(type, value) {
     return `${numericValue.toFixed(2)} SAR`;
   }
 
-  if (ruleType === "profit margin" && Number.isFinite(numericValue)) {
+  if (
+    (ruleType === "profit margin" || ruleType === "minimum margin") &&
+    Number.isFinite(numericValue)
+  ) {
     return `${numericValue}%`;
   }
 
@@ -406,11 +418,15 @@ function PricingRuleModal({ initial, onClose, onSave }) {
       return setFormError("Value must be a valid number.");
     }
 
-    if (type === "profit margin") {
+    if (type === "profit margin" || type === "minimum margin") {
       if (numericValue <= 0 || numericValue >= 100) {
         return setFormError(
-          "Profit margin must be greater than 0 and less than 100."
+          "Margin must be greater than 0 and less than 100."
         );
+      }
+
+      if (!/^\d+(\.\d{1,2})?$/.test(String(value))) {
+        return setFormError("Margin can have up to two decimal places only.");
       }
     }
 

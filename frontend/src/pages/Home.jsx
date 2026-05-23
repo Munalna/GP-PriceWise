@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../client";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,10 +11,6 @@ import {
  Gauge,
   FileText,
   BarChart3,
-  Bot,
-  X,
-  Send,
-  Sparkles,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,16 +19,6 @@ const Home = () => {
   const { user } = useAuth();
   const [userName, setUserName] = useState("");
 
-  // chatbot state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      from: "bot",
-      text: "Hi! I'm PriceWise AI 👋 Ask me anything about pricing your menu, managing costs, or seasonal strategies.",
-    },
-  ]);
-  const [input, setInput] = useState("");
-  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const getUserName = async () => {
@@ -48,26 +34,6 @@ const Home = () => {
     getUserName();
   }, [user]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, chatOpen]);
-
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-    setMessages((prev) => [...prev, { from: "user", text: trimmed }]);
-    setInput("");
-    // placeholder bot reply — replace with real AI call later
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: "bot",
-          text: "Great question! Once I'm connected to your data I'll give you personalized pricing insights. For now, try exploring the Dashboard or Pricing Rules.",
-        },
-      ]);
-    }, 700);
-  };
 
   return (
     <div style={page}>
@@ -88,14 +54,6 @@ const Home = () => {
         @keyframes hoverFloat {
           0%, 100% { transform: translateY(-6px); opacity: 1; }
           50%      { transform: translateY(-14px); opacity: 1; }
-        }
-        @keyframes chatPulse {
-          0%, 100% { box-shadow: 0 8px 25px rgba(91,45,137,0.4), 0 0 0 0 rgba(91,45,137,0.4); }
-          50%      { box-shadow: 0 8px 25px rgba(91,45,137,0.4), 0 0 0 14px rgba(91,45,137,0); }
-        }
-        @keyframes panelIn {
-          from { opacity: 0; transform: translateY(20px) scale(0.95); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         /* HERO */
@@ -147,17 +105,6 @@ const Home = () => {
         .workflow-card { animation: slideUp 0.6s ease-out 0.5s both; }
         .tip-card      { animation: slideUp 0.6s ease-out 0.7s both; }
 
-        /* CHATBOT */
-        .chat-fab {
-          animation: chatPulse 2.5s ease-in-out infinite;
-          transition: transform 0.2s ease;
-        }
-        .chat-fab:hover {
-          transform: scale(1.08);
-        }
-        .chat-panel {
-          animation: panelIn 0.3s ease-out;
-        }
       `}</style>
 
       <section className="hero-card" style={heroCard}>
@@ -238,62 +185,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ====== CHATBOT ====== */}
-      {chatOpen && (
-        <div className="chat-panel" style={chatPanel}>
-          <div style={chatHeader}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={chatHeaderIcon}>
-                <Sparkles size={18} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 900, fontSize: "15px" }}>PriceWise AI</div>
-                <div style={{ fontSize: "11px", opacity: 0.85 }}>Your pricing assistant</div>
-              </div>
-            </div>
-            <button style={chatCloseBtn} onClick={() => setChatOpen(false)} aria-label="Close chat">
-              <X size={18} />
-            </button>
-          </div>
-
-          <div style={chatMessages}>
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  ...chatBubble,
-                  ...(m.from === "user" ? userBubble : botBubble),
-                }}
-              >
-                {m.text}
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div style={chatInputRow}>
-            <input
-              style={chatInput}
-              placeholder="Ask about pricing, costs, seasons..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            />
-            <button style={chatSendBtn} onClick={handleSend} aria-label="Send">
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <button
-        className="chat-fab"
-        style={chatFab}
-        onClick={() => setChatOpen((o) => !o)}
-        aria-label="Open PriceWise AI"
-      >
-        {chatOpen ? <X size={26} /> : <Bot size={26} />}
-      </button>
     </div>
   );
 };
@@ -458,134 +349,4 @@ const tipCard = {
   padding: "18px",
 };
 
-/* === Chatbot styles === */
-const chatFab = {
-  position: "fixed",
-  bottom: "28px",
-  right: "28px",
-  width: "62px",
-  height: "62px",
-  borderRadius: "50%",
-  background: "linear-gradient(135deg, #5b2d89, #2d1b4e)",
-  color: "white",
-  border: "none",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 1000,
-};
-
-const chatPanel = {
-  position: "fixed",
-  bottom: "104px",
-  right: "28px",
-  width: "360px",
-  maxHeight: "520px",
-  backgroundColor: "white",
-  borderRadius: "20px",
-  boxShadow: "0 25px 60px rgba(45,27,78,0.3)",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-  zIndex: 1000,
-};
-
-const chatHeader = {
-  background: "linear-gradient(135deg, #2d1b4e, #5b2d89)",
-  color: "white",
-  padding: "16px 18px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-};
-
-const chatHeaderIcon = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "12px",
-  backgroundColor: "rgba(255,255,255,0.2)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const chatCloseBtn = {
-  background: "rgba(255,255,255,0.15)",
-  border: "none",
-  color: "white",
-  cursor: "pointer",
-  width: "30px",
-  height: "30px",
-  borderRadius: "8px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const chatMessages = {
-  flex: 1,
-  overflowY: "auto",
-  padding: "16px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "10px",
-  backgroundColor: "#faf8ff",
-  minHeight: "240px",
-  maxHeight: "340px",
-};
-
-const chatBubble = {
-  padding: "10px 14px",
-  borderRadius: "14px",
-  fontSize: "14px",
-  lineHeight: 1.5,
-  maxWidth: "80%",
-  wordWrap: "break-word",
-};
-
-const botBubble = {
-  backgroundColor: "white",
-  color: "#2d1b4e",
-  alignSelf: "flex-start",
-  border: "1px solid #ece4ff",
-  borderBottomLeftRadius: "4px",
-};
-
-const userBubble = {
-  background: "linear-gradient(135deg, #5b2d89, #7c3aed)",
-  color: "white",
-  alignSelf: "flex-end",
-  borderBottomRightRadius: "4px",
-};
-
-const chatInputRow = {
-  display: "flex",
-  gap: "8px",
-  padding: "12px",
-  borderTop: "1px solid #ece4ff",
-  backgroundColor: "white",
-};
-
-const chatInput = {
-  flex: 1,
-  border: "1px solid #ece4ff",
-  borderRadius: "12px",
-  padding: "10px 14px",
-  fontSize: "14px",
-  outline: "none",
-  color: "#2d1b4e",
-};
-
-const chatSendBtn = {
-  backgroundColor: "#5b2d89",
-  color: "white",
-  border: "none",
-  borderRadius: "12px",
-  width: "42px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-};
 export default Home;

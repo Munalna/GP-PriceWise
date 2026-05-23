@@ -18,7 +18,6 @@ import {
 
 const Costs = () => {
   const queryClient = useQueryClient();
-  const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
 useEffect(() => {
@@ -35,19 +34,28 @@ useEffect(() => {
 
   const [viewMode, setViewMode] = useState("all");
 
-  const { data: fixedCosts = [], isLoading: loadingFixed } = useQuery({
+  const {
+    data: fixedCosts = [],
+    isLoading: loadingFixed,
+    error: fixedCostsError,
+  } = useQuery({
     queryKey: ["fixedCosts"],
     queryFn: fetchFixedCosts,
     staleTime: 1000 * 60 * 60, // 1 hour
   });
 
-  const { data: components = [], isLoading: loadingVars } = useQuery({
+  const {
+    data: components = [],
+    isLoading: loadingVars,
+    error: variableComponentsError,
+  } = useQuery({
     queryKey: ["varComponents"],
     queryFn: fetchVariableComponents,
     staleTime: 1000 * 60 * 60 , //1 hour
   });
 
   const loading = loadingFixed || loadingVars;
+  const error = fixedCostsError?.message || variableComponentsError?.message || "";
 
   const invalidateFixed = () =>
     queryClient.invalidateQueries({ queryKey: ["fixedCosts"] });

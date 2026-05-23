@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Alert, Button, Modal } from 'react-bootstrap';
+import { Button, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
@@ -10,6 +10,8 @@ export default function ImportSales({ userId, onSuccess }) {
     const [columns, setColumns] = useState([]);
     const [productCol, setProductCol] = useState('');
     const [quantityCol, setQuantityCol] = useState('');
+    const [dateCol, setDateCol] = useState('');
+    const [filePeriod, setFilePeriod] = useState('monthly');
     const [fileName, setFileName] = useState('');
     const [importing, setImporting] = useState(false);
     const [drafting, setDrafting] = useState(false);
@@ -24,7 +26,9 @@ export default function ImportSales({ userId, onSuccess }) {
         productName: row[productCol],
         quantity: Number(row[quantityCol]) || 0,
         totalPrice: Number(row.Total ?? row.total ?? row.total_price ?? row.TotalPrice) || 0,
-        saleDate: row.Date ?? row.date ?? row.sale_date ?? row.SaleDate,
+        saleDate: dateCol
+            ? row[dateCol]
+            : row.Date ?? row.date ?? row.sale_date ?? row.SaleDate,
     }));
 
     const handleFileUpload = (e) => {
@@ -52,6 +56,7 @@ export default function ImportSales({ userId, onSuccess }) {
                 setColumns(Object.keys(parsedData[0]));
                 setProductCol('');
                 setQuantityCol('');
+                setDateCol('');
             }
         };
 
@@ -59,7 +64,10 @@ export default function ImportSales({ userId, onSuccess }) {
     };
 
     const submitImport = async (mappedData) => {
-        const response = await api.post('/salesData/import', { mappedData });
+        const response = await api.post('/salesData/import', {
+            mappedData,
+            importPeriod: dateCol ? 'dates' : filePeriod,
+        });
 
         setImportResult(response.data);
         setSuccessMessage('Imported successfully');
@@ -85,7 +93,9 @@ export default function ImportSales({ userId, onSuccess }) {
             setSuccessMessage('');
             setImportResult(null);
 
-            const validation = await api.post('/salesData/validate-products', { mappedData });
+            const validation = await api.post('/salesData/validate-products', {
+                mappedData,
+            });
 
             if (validation.data?.hasMissingProducts) {
                 setMissingProducts(validation.data.missingProducts || []);
@@ -138,33 +148,34 @@ export default function ImportSales({ userId, onSuccess }) {
         setAlertMessage('Import cancelled. No draft products were created.');
     };
 
-    const alertVariant = alertMessage.includes('failed')
-        ? 'danger'
+    const alertType = alertMessage.includes('cancelled')
+        ? 'cancelled'
+        : alertMessage.includes('failed')
+        ? 'failed'
         : alertMessage.includes('Draft') || alertMessage.includes('draft')
-        ? 'info'
+        ? 'draft'
         : 'success';
+
+    const alertTitle = alertType === 'failed'
+        ? 'Import Failed'
+        : alertType === 'draft'
+        ? 'Draft Products Added'
+        : alertType === 'cancelled'
+        ? 'Import Cancelled'
+        : 'Import Successful';
 
     return (
         <div className="sales-import">
             {alertMessage && (
-                <Alert
-                    variant={alertVariant}
-                    dismissible
-                    onClose={() => setAlertMessage('')}
-                    className="mb-3"
-                >
-                    <Alert.Heading>
-                        {alertVariant === 'danger'
-                            ? 'Import Failed'
-                            : alertVariant === 'info'
-                            ? 'Draft Products Added'
-                            : 'Import Successful'}
-                    </Alert.Heading>
-                    <p className="mb-2">{alertMessage}</p>
-                    {importResult && alertVariant === 'info' && (
-                        <div className="mt-3">
+                <div className={`sales-feedback sales-feedback-${alertType}`} role="status">
+                    <div className="sales-feedback-content">
+                        <strong>{alertTitle}</strong>
+                        <span>{alertMessage}</span>
+                    </div>
+                    {importResult && alertType === 'draft' && (
+                        <div className="sales-feedback-actions">
                             <button
-                                className="btn btn-sm btn-primary"
+                                className="sales-feedback-primary"
                                 onClick={() => {
                                     setAlertMessage('');
                                     setImportResult(null);
@@ -174,7 +185,7 @@ export default function ImportSales({ userId, onSuccess }) {
                                 Go to Products Page
                             </button>
                             <button
-                                className="btn btn-sm btn-secondary ms-2"
+                                className="sales-feedback-secondary"
                                 onClick={() => {
                                     setAlertMessage('');
                                     setImportResult(null);
@@ -185,7 +196,15 @@ export default function ImportSales({ userId, onSuccess }) {
                             </button>
                         </div>
                     )}
-                </Alert>
+                    <button
+                        className="sales-feedback-close"
+                        onClick={() => setAlertMessage('')}
+                        type="button"
+                        aria-label="Dismiss message"
+                    >
+                        x
+                    </button>
+                </div>
             )}
 
             <div className="sales-section-heading">
@@ -248,6 +267,31 @@ export default function ImportSales({ userId, onSuccess }) {
                                 {columns.map((col) => <option key={col} value={col}>{col}</option>)}
                             </select>
                         </label>
+
+                        <label className="sales-field">
+                            <span>Date Column</span>
+                            <select
+                                onChange={(e) => setDateCol(e.target.value)}
+                                value={dateCol}
+                            >
+                                <option value="">No date column</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                            </select>
+                        </label>
+
+                        {!dateCol && (
+                            <label className="sales-field">
+                                <span>File Period <span className="sales-required">*</span></span>
+                                <select
+                                    onChange={(e) => setFilePeriod(e.target.value)}
+                                    value={filePeriod}
+                                >
+                                    <option value="daily">Daily sales</option>
+                                    <option value="weekly">Weekly sales</option>
+                                    <option value="monthly">Monthly sales</option>
+                                </select>
+                            </label>
+                        )}
                     </div>
 
                     <button

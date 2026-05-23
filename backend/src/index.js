@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -9,11 +11,15 @@ import reportRoutes from "./routes/reportRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import salesDataRoutes from "./routes/salesDataRoutes.js";
 import pricingRuleRoutes from "./routes/pricingRuleRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 
 import { startSeasonScheduler } from "./jobs/seasonScheduler.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -36,6 +42,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sales-data", salesDataRoutes);
 app.use("/api/salesData", salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 app.use(cors({
   origin: '*',

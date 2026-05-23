@@ -27,13 +27,47 @@ function toSaleDate(value) {
     return date.toISOString().slice(0, 10);
 }
 
-function cleanSalesRows(mappedData) {
+function getImportPeriodDays(importPeriod) {
+    const normalized = String(importPeriod || '').trim().toLowerCase();
+
+    if (normalized === 'daily') return 1;
+    if (normalized === 'weekly') return 7;
+    if (normalized === 'monthly') return 30;
+
+    return null;
+}
+
+function buildSyntheticPeriodDates(rowCount, importPeriod) {
+    const periodDays = getImportPeriodDays(importPeriod);
+    if (!periodDays || rowCount <= 0) return [];
+
+    const endDate = new Date();
+    endDate.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - periodDays + 1);
+
+    if (rowCount === 1) {
+        return [startDate.toISOString().slice(0, 10)];
+    }
+
+    return Array.from({ length: rowCount }, (_, index) => {
+        const offset = Math.round((index * (periodDays - 1)) / (rowCount - 1));
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + offset);
+        return date.toISOString().slice(0, 10);
+    });
+}
+
+function cleanSalesRows(mappedData, importPeriod = null) {
+    const syntheticDates = buildSyntheticPeriodDates(mappedData.length, importPeriod);
+
     return mappedData
-        .map((row) => ({
+        .map((row, index) => ({
             product_name: normalizeProductName(row.product_name ?? row.productName),
             quantity: toNumber(row.quantity),
             total_price: toNumber(row.total_price ?? row.totalPrice),
-            sale_date: toSaleDate(row.sale_date ?? row.saleDate),
+            sale_date: syntheticDates[index] || toSaleDate(row.sale_date ?? row.saleDate),
         }))
         .filter((row) => row.product_name);
 }
@@ -177,7 +211,7 @@ export const createDraftProducts = async (req, res) => {
 };
 
 export const importSalesData = async (req, res) => {
-    const { mappedData } = req.body;
+    const { mappedData, importPeriod } = req.body;
     const userId = req.user?.id;
     const payloadError = validateImportPayload(mappedData, userId);
 
@@ -187,7 +221,7 @@ export const importSalesData = async (req, res) => {
 
     try {
         const client = supabaseAdmin || supabase;
-        const cleanedRows = cleanSalesRows(mappedData);
+        const cleanedRows = cleanSalesRows(mappedData, importPeriod);
 
         if (cleanedRows.length === 0) {
             return res.status(400).json({ error: 'No valid rows found. Each row needs a product name.' });
@@ -236,6 +270,7 @@ export const importSalesData = async (req, res) => {
         return res.status(200).json({
             message: 'Sales data imported successfully.',
             importedCount: insertedSalesRows?.length || salesRows.length,
+            importPeriod: importPeriod || 'dates',
             newProductsAdded: false,
             newProductsCount: 0,
             newProducts: [],

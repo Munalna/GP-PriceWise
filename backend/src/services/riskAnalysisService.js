@@ -285,7 +285,13 @@ const buildMetrics = (productData) => {
   const category = productData.category || "Unknown";
   const season = normalizeSeason(productData.season);
 
-  const baseCost = buildNumeric(productData.base_cost);
+  const componentCost = buildNumeric(productData.component_cost ?? productData.base_cost);
+  const fixedCostShare = buildNumeric(productData.fixed_cost_share);
+  const pricingCost = buildNumeric(
+    productData.pricing_cost,
+    componentCost + fixedCostShare
+  );
+  const baseCost = pricingCost;
   const currentPrice = buildNumeric(productData.current_price);
   const competitorAveragePrice = buildNumeric(productData.competitor_average_price);
   const fixedVariableCostRatio = buildNumeric(productData.fixed_variable_cost_ratio);
@@ -308,6 +314,9 @@ const buildMetrics = (productData) => {
     category,
     season,
     base_cost: roundTo(baseCost),
+    component_cost: roundTo(componentCost),
+    fixed_cost_share: roundTo(fixedCostShare),
+    pricing_cost: roundTo(pricingCost),
     current_price: roundTo(currentPrice),
     competitor_average_price: roundTo(competitorAveragePrice),
     fixed_variable_cost_ratio: roundTo(fixedVariableCostRatio),

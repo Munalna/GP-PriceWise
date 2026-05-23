@@ -98,8 +98,11 @@ export async function analyzeSingleProduct(req, res, next) {
           current_price: productInput.current_price,
         },
         cost: {
-          base_cost: productInput.base_cost,
+          base_cost: productInput.pricing_cost || productInput.base_cost,
           component_cost: productInput.component_cost,
+          fixed_cost_share: productInput.fixed_cost_share,
+          pricing_cost: productInput.pricing_cost,
+          fixed_cost_allocation: productInput.fixed_cost_allocation,
           stored_base_cost: productInput.stored_base_cost,
         },
         market: {
@@ -111,6 +114,7 @@ export async function analyzeSingleProduct(req, res, next) {
         },
         rules: {
           target_margin: productInput.target_margin,
+          minimum_margin: productInput.minimum_margin,
           product_rules: productInput.product_rules || [],
           category_rules: productInput.category_rules || [],
           season_rules: productInput.season_rules || [],
@@ -155,8 +159,8 @@ function normalizeRuleType(type) {
 function getAllAppliedRules(productInput) {
   return [
     ...(productInput.product_rules || []),
-    ...(productInput.season_rules || []),
     ...(productInput.category_rules || []),
+    ...(productInput.season_rules || []),
   ].filter(Boolean);
 }
 
@@ -166,20 +170,33 @@ function findRuleByType(productInput, ruleType) {
   /*
     Priority:
     1. Product rules  -> most specific
-    2. Season rules   -> active seasonal context
-    3. Category rules -> general category-level policy
+    2. Category rules -> general category-level policy
+    3. Season rules   -> active seasonal context
   */
   return (
     (productInput.product_rules || []).find(
       (rule) => normalizeRuleType(rule.type) === normalizedType
     ) ||
-    (productInput.season_rules || []).find(
-      (rule) => normalizeRuleType(rule.type) === normalizedType
-    ) ||
     (productInput.category_rules || []).find(
       (rule) => normalizeRuleType(rule.type) === normalizedType
     ) ||
+    (productInput.season_rules || []).find(
+      (rule) => normalizeRuleType(rule.type) === normalizedType
+    ) ||
     null
+  );
+}
+
+function calculatePriceFloor(baseCost, minimumMargin) {
+  const numericBaseCost = Number(baseCost) || 0;
+  const numericMinimumMargin = Number(minimumMargin) || 0;
+
+  if (numericBaseCost <= 0) return 0;
+  if (numericMinimumMargin <= 0) return Number(numericBaseCost.toFixed(2));
+  if (numericMinimumMargin >= 100) return Number(numericBaseCost.toFixed(2));
+
+  return Number(
+    (numericBaseCost / (1 - numericMinimumMargin / 100)).toFixed(2)
   );
 }
 
@@ -204,64 +221,58 @@ function roundUpToPriceEnding(price, ending) {
 }
 
 function applyPricingRulesToRecommendation(productInput, initialPrice) {
-  const baseCost = Number(productInput.base_cost) || 0;
+  const componentCost =
+    Number(productInput.component_cost ?? productInput.base_cost) || 0;
+  const fixedCostShare = Number(productInput.fixed_cost_share) || 0;
+  const pricingCost =
+    Number(productInput.pricing_cost) || componentCost + fixedCostShare;
+  const priceFloor = calculatePriceFloor(
+    pricingCost,
+    productInput.minimum_margin
+  );
   let finalPrice = Number(initialPrice) || 0;
 
   const appliedRules = [];
 
   const profitMarginRule = findRuleByType(productInput, "profit margin");
- // const minimumMarginRule = findRuleByType(productInput, "minimum margin");
   const maximumPriceRule = findRuleByType(productInput, "maximum price");
   const roundingRule = findRuleByType(productInput, "rounding");
+
+  if (finalPrice < priceFloor) {
+    finalPrice = priceFloor;
+    appliedRules.push(
+      `Minimum Margin Protection applied: price raised to the ${priceFloor.toFixed(
+        2
+      )} SAR price floor`
+    );
+  }
 
   /*
     Profit Margin Rule:
     If the current recommendation is lower than the target profit price,
     raise it to protect the intended profit.
   */
-  if (profitMarginRule && baseCost > 0) {
+  if (profitMarginRule && pricingCost > 0) {
     const marginPercent = Number(profitMarginRule.value);
 
     if (Number.isFinite(marginPercent) && marginPercent > 0) {
       const profitPrice = Number(
-        (baseCost * (1 + marginPercent / 100)).toFixed(2)
+        (pricingCost * (1 + marginPercent / 100)).toFixed(2)
       );
 
       if (finalPrice < profitPrice) {
         finalPrice = profitPrice;
         appliedRules.push(
-          `Profit Margin Rule applied: price raised to keep ${marginPercent}% profit above base cost`
+          `Profit Margin Rule applied: price raised to keep ${marginPercent}% profit above pricing cost`
         );
       }
     }
   }
 
   /*
-    Minimum Margin Protection:
-    This is a safety rule. It prevents the recommended price
-    from going below the minimum allowed margin.
-  */
- /* if (minimumMarginRule && baseCost > 0) {
-    const marginPercent = Number(minimumMarginRule.value);
-
-    if (Number.isFinite(marginPercent) && marginPercent > 0) {
-      const minimumSafePrice = Number(
-        (baseCost * (1 + marginPercent / 100)).toFixed(2)
-      );
-
-      if (finalPrice < minimumSafePrice) {
-        finalPrice = minimumSafePrice;
-        appliedRules.push(
-          `Minimum Margin Protection applied: price raised to protect ${marginPercent}% minimum margin`
-        );
-      }
-    }
-  }  */
-
-
-  /*
     Maximum Price Limit:
-    Caps the recommended price if it exceeds the maximum allowed value.
+    Caps the recommended price if it exceeds the maximum allowed value,
+    unless the cap is below the mandatory price floor.
   */
   if (maximumPriceRule) {
     const maximumPrice = Number(maximumPriceRule.value);
@@ -271,12 +282,20 @@ function applyPricingRulesToRecommendation(productInput, initialPrice) {
       maximumPrice > 0 &&
       finalPrice > maximumPrice
     ) {
-      finalPrice = maximumPrice;
-      appliedRules.push(
-        `Maximum Price Limit applied: price capped at ${maximumPrice.toFixed(
-          2
-        )} SAR`
-      );
+      if (maximumPrice >= priceFloor) {
+        finalPrice = maximumPrice;
+        appliedRules.push(
+          `Maximum Price Limit applied: price capped at ${maximumPrice.toFixed(
+            2
+          )} SAR`
+        );
+      } else {
+        appliedRules.push(
+          `Maximum Price Limit ignored: ${maximumPrice.toFixed(
+            2
+          )} SAR is below the ${priceFloor.toFixed(2)} SAR price floor`
+        );
+      }
     }
   }
 
@@ -313,33 +332,50 @@ function applyPricingRulesToRecommendation(productInput, initialPrice) {
       maximumPrice > 0 &&
       finalPrice > maximumPrice
     ) {
-      finalPrice = maximumPrice;
-      appliedRules.push(
-        `Maximum Price Limit re-applied after rounding: final price capped at ${maximumPrice.toFixed(
-          2
-        )} SAR`
-      );
+      if (maximumPrice >= priceFloor) {
+        finalPrice = maximumPrice;
+        appliedRules.push(
+          `Maximum Price Limit re-applied after rounding: final price capped at ${maximumPrice.toFixed(
+            2
+          )} SAR`
+        );
+      } else {
+        finalPrice = priceFloor;
+      }
     }
+  }
+
+  if (finalPrice < priceFloor) {
+    finalPrice = priceFloor;
   }
 
   return {
     finalPrice: Number(finalPrice.toFixed(2)),
+    priceFloor,
     appliedRules,
     allRules: getAllAppliedRules(productInput),
   };
 }
 
 function buildFallbackRecommendedPrice(productInput) {
-  const baseCost = Number(productInput.base_cost) || 0;
+  const componentCost =
+    Number(productInput.component_cost ?? productInput.base_cost) || 0;
+  const fixedCostShare = Number(productInput.fixed_cost_share) || 0;
+  const pricingCost =
+    Number(productInput.pricing_cost) || componentCost + fixedCostShare;
+  const priceFloor = calculatePriceFloor(
+    pricingCost,
+    productInput.minimum_margin
+  );
   const competitorAverage = Number(productInput.competitor_average_price) || 0;
   const currentPrice = Number(productInput.current_price) || 0;
 
   let recommendedPrice;
 
-  if (baseCost > 0 && competitorAverage > 0) {
-    recommendedPrice = Math.max(baseCost * 1.3, competitorAverage);
-  } else if (baseCost > 0) {
-    recommendedPrice = baseCost * 1.35;
+  if (priceFloor > 0 && competitorAverage > 0) {
+    recommendedPrice = Math.max(priceFloor, competitorAverage);
+  } else if (priceFloor > 0) {
+    recommendedPrice = priceFloor;
   } else if (competitorAverage > 0) {
     recommendedPrice = competitorAverage;
   } else {
@@ -382,6 +418,10 @@ export async function getAIPriceRecommendation(req, res, next) {
         buildFallbackRecommendedPrice(productInput);
 
       aiRecommendation = {
+        price_floor: calculatePriceFloor(
+          productInput.pricing_cost,
+          productInput.minimum_margin
+        ),
         recommended_price: fallbackRecommendedPrice,
         recommendation_type:
           fallbackRecommendedPrice > productInput.current_price
@@ -410,6 +450,7 @@ export async function getAIPriceRecommendation(req, res, next) {
     );
 
     aiRecommendation.recommended_price = ruleBasedResult.finalPrice;
+    aiRecommendation.price_floor = ruleBasedResult.priceFloor;
 
     aiRecommendation.recommendation_type =
       ruleBasedResult.finalPrice > productInput.current_price
@@ -446,8 +487,12 @@ export async function getAIPriceRecommendation(req, res, next) {
           current_price: productInput.current_price,
         },
         cost: {
-          base_cost: productInput.base_cost,
+          base_cost: productInput.pricing_cost || productInput.base_cost,
           component_cost: productInput.component_cost,
+          fixed_cost_share: productInput.fixed_cost_share,
+          pricing_cost: productInput.pricing_cost,
+          price_floor: ruleBasedResult.priceFloor,
+          fixed_cost_allocation: productInput.fixed_cost_allocation,
         },
         market: {
           competitor_average_price: productInput.competitor_average_price,
@@ -458,6 +503,7 @@ export async function getAIPriceRecommendation(req, res, next) {
         },
         rules: {
           target_margin: productInput.target_margin,
+          minimum_margin: productInput.minimum_margin,
           product_rules: productInput.product_rules || [],
           category_rules: productInput.category_rules || [],
           season_rules: productInput.season_rules || [],
