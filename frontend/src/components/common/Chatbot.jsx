@@ -55,18 +55,9 @@ const Chatbot = () => {
   return (
     <>
       <style>{`
-        @keyframes chatPulse {
-          0%, 100% { box-shadow: 0 8px 25px rgba(91,45,137,0.4), 0 0 0 0 rgba(91,45,137,0.4); }
-          50% { box-shadow: 0 8px 25px rgba(91,45,137,0.4), 0 0 0 14px rgba(91,45,137,0); }
-        }
-
         @keyframes panelIn {
           from { opacity: 0; transform: translateY(20px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .pricewise-chat-fab {
-          animation: chatPulse 2.5s ease-in-out infinite;
         }
 
         .pricewise-chat-fab:hover {
@@ -201,6 +192,7 @@ const chatFab = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+  boxShadow: "0 8px 25px rgba(91,45,137,0.35)",
   zIndex: 1000,
 };
 
