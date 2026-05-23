@@ -579,9 +579,9 @@ function SeasonModal({ initial, onClose, onSave }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.modalHeader}>
-          <h3 style={styles.modalTitle}>
-            {initial?.id ? "Update Season" : "Create Season"}
-          </h3>
+         <h3 style={styles.formTitle}>
+  {initial?.id ? "Edit Season" : "Add Season"}
+</h3>
           <button style={styles.closeBtn} onClick={onClose} type="button">
             ✕
           </button>
@@ -821,6 +821,14 @@ iconBtn: {
     whiteSpace: "nowrap",
     minWidth: 0,
   },
+
+  formTitle: {
+  margin: 0,
+  fontSize: 30,
+  fontWeight: 800,
+  color: "#111827",
+},
+
   closeBtn: {
     border: "none",
     background: "#eef2f7",

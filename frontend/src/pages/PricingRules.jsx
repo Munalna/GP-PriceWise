@@ -474,9 +474,9 @@ function PricingRuleModal({ initial, onClose, onSave }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.modalHeader}>
-          <h3 style={{ margin: 0 }}>
-            {initial?.id ? "Update Rule" : "Create Rule"}
-          </h3>
+          <h3 style={styles.modalTitle}>
+  {initial?.id ? "Edit Pricing Rule" : "Add Pricing Rule"}
+</h3>
           <button style={styles.closeBtn} onClick={onClose} type="button">
             ✕
           </button>
@@ -848,6 +848,13 @@ const styles = {
     fontSize: 13,
     fontWeight: 600,
   },
+
+  modalTitle: {
+  margin: 0,
+  fontSize: 30,
+  fontWeight: 800,
+  color: "#111827",
+},
 
   requiredStar: {
     color: "#e74c3c",

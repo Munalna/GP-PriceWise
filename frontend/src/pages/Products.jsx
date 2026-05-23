@@ -1146,7 +1146,7 @@ const handleDeleteCategory = async () => {
       {showAddModal && (
         <div style={modalOverlay}>
           <div style={modalContentCustom}>
-            <h2 style={modalTitleCustom}>Add New Product</h2>
+            <h2 style={modalTitleForm}>Add Product</h2>
 
             {feedback.location === "add-product-modal" && (
   <Alert
@@ -1391,7 +1391,7 @@ const handleDeleteCategory = async () => {
       {showEditModal && selectedProduct && (
         <div style={modalOverlay}>
           <div style={modalContentLarge}>
-            <h2 style={modalTitleCustom}>Edit: {selectedProduct.name}</h2>
+            <h2 style={modalTitleForm}>Edit: {selectedProduct.name}</h2>
 
 {feedback.location === "edit-product-modal" && (
   <Alert
@@ -2072,6 +2072,13 @@ const loadingStyle = {
   padding: "100px",
   fontSize: "20px",
   color: "#5b2d89",
+};
+
+const modalTitleForm = {
+  fontSize: "30px",
+  fontWeight: "800",
+  color: "#111827",
+  marginBottom: "25px",
 };
 
 const compSelectionGrid = {
