@@ -197,7 +197,7 @@ const Signup = () => {
         formData.businessName
       );
 
-      setSuccess('Account created successfully!');
+      setSuccess('Account created! Please check your email to activate your account.');
       
       // Clear form
       setFormData({
