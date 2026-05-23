@@ -98,6 +98,24 @@ const showCategoryFeedback = (type, message) => {
   }, FEEDBACK_DURATION);
 };
 
+const getApiErrorMessage = (err, fallback) => {
+  const rawMessage =
+    err?.response?.data?.error ||
+    err?.response?.data?.message ||
+    err?.message ||
+    "";
+
+  if (
+    err?.response?.status === 409 ||
+    rawMessage.includes("unique_product_name_per_user_lower") ||
+    rawMessage.includes("unique_category_name_per_user_lower")
+  ) {
+    return fallback;
+  }
+
+  return rawMessage || fallback;
+};
+
 useEffect(() => {
   if (!feedback.location) return;
   const el = document.getElementById(feedback.location);
@@ -124,13 +142,24 @@ useEffect(() => {
   };
 
   const calculateTotalVcost = (prodComponents) => {
-    if (!prodComponents || !Array.isArray(prodComponents)) return 0;
-    return prodComponents.reduce((sum, item) => {
-      const dbInfo = varComponents.find((c) => c.name === item.name);
-      const unitCost = dbInfo ? Number(dbInfo.cost_per_unit) : 0;
-      return sum + unitCost * (Number(item.qty) || 0);
-    }, 0);
-  };
+  if (!prodComponents || !Array.isArray(prodComponents)) return 0;
+
+  return prodComponents.reduce((sum, item) => {
+    const dbInfo =
+      varComponents.find((c) => c.id === item.id) ||
+      varComponents.find((c) => c.name === item.name);
+
+    const unitCost = Number(
+      dbInfo?.cost_per_unit ??
+      item.cost_per_unit ??
+      dbInfo?.cost ??
+      item.cost ??
+      0
+    );
+
+    return sum + unitCost * (Number(item.qty) || 0);
+  }, 0);
+};
 
   const filteredComponents = varComponents.filter((comp) =>
     comp.name.toLowerCase().includes(componentSearch.toLowerCase())
@@ -200,15 +229,32 @@ const handleAnalyzePricing = async (productId, product, mode = "analyze") => {
   }
 };
 
-  const toggleComponent = (name, isEdit = false) => {
-    const target = isEdit ? selectedProduct : newProd;
-    let updatedComps = [...(target.components || [])];
-    const index = updatedComps.findIndex((c) => c.name === name);
-    if (index > -1) updatedComps = updatedComps.filter((c) => c.name !== name);
-    else updatedComps.push({ name, qty: 1 });
-    if (isEdit) setSelectedProduct({ ...selectedProduct, components: updatedComps });
-    else setNewProd({ ...newProd, components: updatedComps });
-  };
+  const toggleComponent = (component, isEdit = false) => {
+  const name = component.name;
+  const target = isEdit ? selectedProduct : newProd;
+
+  let updatedComps = [...(target.components || [])];
+  const index = updatedComps.findIndex((c) => c.name === name);
+
+  if (index > -1) {
+    updatedComps = updatedComps.filter((c) => c.name !== name);
+  } else {
+    updatedComps.push({
+      id: component.id,
+      name: component.name,
+      qty: 1,
+      unit: component.unit,
+      cost_per_unit: component.cost_per_unit,
+      cost: component.cost,
+    });
+  }
+
+  if (isEdit) {
+    setSelectedProduct({ ...selectedProduct, components: updatedComps });
+  } else {
+    setNewProd({ ...newProd, components: updatedComps });
+  }
+};
 
   const updateQty = (name, val, isEdit = false) => {
   const target = isEdit ? selectedProduct : newProd;
@@ -252,10 +298,10 @@ const handleAddNewCategory = async () => {
 
     setNewCatName("");
     showCategoryFeedback("success", "Category added successfully.");
-  } catch (err) {
+    } catch (err) {
     showCategoryFeedback(
       "danger",
-      err.response?.data?.error || err.message || "Error adding category."
+      getApiErrorMessage(err, "Category name already exists.")
     );
   }
 };
@@ -292,10 +338,10 @@ const handleSaveProduct = async () => {
     setTimeout(async () => {
       await invalidate();
     }, 800);
-  } catch (err) {
+    } catch (err) {
     showFeedback(
       "danger",
-      err.response?.data?.error || err.message || "Error saving product.",
+      getApiErrorMessage(err, "Product name already exists."),
       "add-product-modal"
     );
   }
@@ -331,10 +377,10 @@ const handleUpdateProduct = async () => {
     setTimeout(async () => {
       await invalidate();
     }, 800);
-  } catch (err) {
+   } catch (err) {
     showFeedback(
       "danger",
-      err.response?.data?.error || err.message || "Error updating product.",
+      getApiErrorMessage(err, "Product name already exists."),
       "edit-product-modal"
     );
   }
@@ -498,9 +544,12 @@ const handleDeleteCategory = async () => {
     );
   }
 };
-  const getComponentUnit = (name) => {
-  const comp = varComponents.find((c) => c.name === name);
-  return comp?.unit || "";
+const getComponentUnit = (item) => {
+  const dbInfo =
+    varComponents.find((c) => c.id === item.id) ||
+    varComponents.find((c) => c.name === item.name);
+
+  return dbInfo?.unit || item.unit || "";
 };
 
   return (<div style={pageContainer}>
@@ -628,12 +677,12 @@ const handleDeleteCategory = async () => {
         await invalidate();
       }, 800);
     } catch (err) {
-      showFeedback(
-        "danger",
-        err.response?.data?.error || err.message || "Error updating category.",
-        `category-${cat.id}`
-      );
-    }
+  showFeedback(
+    "danger",
+    getApiErrorMessage(err, "Category name already exists."),
+    `category-${cat.id}`
+  );
+}
   }}
 >
   Save
@@ -748,7 +797,7 @@ const handleDeleteCategory = async () => {
                                       <div key={i} style={recipeRowMini}>
   <span style={recipeNameMini}>{c.name}</span>
   <span style={recipeQtyMini}>
-    {c.qty} {getComponentUnit(c.name)}
+    {c.qty} {getComponentUnit(c)}
   </span>
 </div>
                                     ))
@@ -831,10 +880,25 @@ const handleDeleteCategory = async () => {
       style={actionBtnOrange}
       title="Edit Product"
       onClick={() => {
-        setSelectedProduct({
-          ...prod,
-          components: comps,
-        });
+        const hydratedComps = comps.map((item) => {
+  const dbInfo =
+    varComponents.find((c) => c.id === item.id) ||
+    varComponents.find((c) => c.name === item.name);
+
+  return {
+    id: dbInfo?.id || item.id,
+    name: dbInfo?.name || item.name,
+    qty: item.qty || 1,
+    unit: dbInfo?.unit || item.unit,
+    cost_per_unit: dbInfo?.cost_per_unit || item.cost_per_unit || 0,
+    cost: dbInfo?.cost || item.cost || 0,
+  };
+});
+
+setSelectedProduct({
+  ...prod,
+  components: hydratedComps,
+});
         setModalError("");
         setEditCatName("");
         setShowEditCategoryInput(false);
@@ -1243,7 +1307,17 @@ const handleDeleteCategory = async () => {
           if (!alreadySelected) {
             setNewProd({
               ...newProd,
-              components: [...newProd.components, { name: comp.name, qty: 1 }],
+             components: [
+  ...newProd.components,
+  {
+    id: comp.id,
+    name: comp.name,
+    qty: 1,
+    unit: comp.unit,
+    cost_per_unit: comp.cost_per_unit,
+    cost: comp.cost,
+  },
+],
             });
           }
 
@@ -1274,7 +1348,7 @@ const handleDeleteCategory = async () => {
   />
 
   <span style={recipeUnitText}>
-    {getComponentUnit(comp.name)}
+   {getComponentUnit(comp)}
   </span>
 
   <button
@@ -1485,7 +1559,7 @@ const handleDeleteCategory = async () => {
       return (
         <div key={comp.id} style={recipeComponentCard(isSelected)}>
           <div
-            onClick={() => toggleComponent(comp.name, true)}
+            onClick={() => toggleComponent(comp, true)}
             style={recipeComponentName(isSelected)}
           >
             {comp.name}

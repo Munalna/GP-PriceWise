@@ -244,16 +244,35 @@ export const getAllProducts = async (userId) => {
   return processedCategories;
 };
 
-// جلب المكونات
+
+
 export const getVariableComponentsList = async (userId) => {
   const { data, error } = await supabase
-    .from("variable_components")
-    .select("*")
-    .eq("owner_id", userId);
+    .from("components")
+    .select(`
+      id,
+      name,
+      cost,
+      user_id,
+      unit,
+      purchase_unit,
+      total_cost_paid,
+      total_quantity,
+      cost_per_unit,
+      created_at
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    logSupabaseError("getVariableComponentsList", error, { userId });
+    throw error;
+  }
+
   return data || [];
 };
+
+
 
 // حفظ الرولز المرتبطة بمنتج أو كاتيقوري
 export const assignPricingRulesToTarget = async (

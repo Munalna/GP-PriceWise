@@ -112,7 +112,10 @@ function getUniqueIds(ids = []) {
 export default function Seasons() {
   const queryClient = useQueryClient();
 
+  //const [successMsg, setSuccessMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+const [errorMsg, setErrorMsg] = useState("");
+  
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -133,10 +136,10 @@ export default function Seasons() {
     return () => clearTimeout(timer);
   }, [successMsg]);
 
-  useEffect(() => {
-  if (!successMsg) return;
+ useEffect(() => {
+  if (!successMsg && !errorMsg) return;
   window.scrollTo({ top: 0, behavior: "smooth" });
-}, [successMsg]);
+}, [successMsg, errorMsg]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["seasons"] });
@@ -273,24 +276,32 @@ export default function Seasons() {
     }
   };
 
-  const onSave = async ({ name, startDate, endDate }) => {
-    try {
-      if (!editing) {
-        await createSeason({ name, startDate, endDate });
-        setSuccessMsg(`"${name}" was created successfully.`);
-      } else {
-        await updateSeason(editing.id, { name, startDate, endDate });
-        setSuccessMsg(`"${name}" was updated successfully.`);
-      }
+const onSave = async ({ name, startDate, endDate }) => {
+  try {
+    setErrorMsg("");
+    setSuccessMsg("");
 
-      await invalidate();
-
-      setShowModal(false);
-      setEditing(null);
-    } catch (e) {
-      alert(e.message || "Save failed");
+    if (!editing) {
+      await createSeason({ name, startDate, endDate });
+      setSuccessMsg(`"${name}" was created successfully.`);
+    } else {
+      await updateSeason(editing.id, { name, startDate, endDate });
+      setSuccessMsg(`"${name}" was updated successfully.`);
     }
-  };
+
+    await invalidate();
+
+    setShowModal(false);
+    setEditing(null);
+  } catch (e) {
+    setSuccessMsg("");
+    setErrorMsg(
+      e?.response?.data?.message ||
+      e?.response?.data?.error ||
+      "Season name already exists."
+    );
+  }
+};
 
   const onDeleteConfirmed = async () => {
     if (!deleteTarget) return;
@@ -336,11 +347,11 @@ export default function Seasons() {
         </div>
       )}
 
-      {error && (
-        <div style={styles.errorBox}>
-          <span style={{ fontWeight: 800 }}>Request failed:</span> {error}
-        </div>
-      )}
+      {(error || errorMsg) && (
+  <div style={styles.errorBox}>
+    <span>{errorMsg || error}</span>
+  </div>
+)}
 
       <div style={styles.card}>
         {loading ? (

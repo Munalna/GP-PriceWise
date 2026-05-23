@@ -52,6 +52,14 @@ export async function addSeason(req, res, next) {
       });
     }
 
+    const trimmedName = String(name).trim();
+
+    if (!trimmedName) {
+      return res.status(400).json({
+        message: "Season name cannot be empty",
+      });
+    }
+
     if (new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({
         message: "endDate must be after startDate",
@@ -59,10 +67,20 @@ export async function addSeason(req, res, next) {
     }
 
     const userId = req.user.id;
-    const created = await createSeason(userId, { name, startDate, endDate });
+    const created = await createSeason(userId, {
+      name: trimmedName,
+      startDate,
+      endDate,
+    });
 
     res.status(201).json(created);
   } catch (e) {
+    if (e?.code === "23505") {
+      return res.status(409).json({
+        message: "Season name already exists",
+      });
+    }
+
     next(e);
   }
 }
@@ -75,6 +93,18 @@ export async function editSeason(req, res, next) {
     const startDate = req.body.startDate ?? req.body.start_date;
     const endDate = req.body.endDate ?? req.body.end_date;
 
+    let trimmedName;
+
+    if (name !== undefined) {
+      trimmedName = String(name).trim();
+
+      if (!trimmedName) {
+        return res.status(400).json({
+          message: "Season name cannot be empty",
+        });
+      }
+    }
+
     if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({
         message: "endDate must be after startDate",
@@ -82,7 +112,11 @@ export async function editSeason(req, res, next) {
     }
 
     const userId = req.user.id;
-    const updated = await updateSeason(userId, id, { name, startDate, endDate });
+    const updated = await updateSeason(userId, id, {
+      name: name !== undefined ? trimmedName : undefined,
+      startDate,
+      endDate,
+    });
 
     if (!updated) {
       return res.status(404).json({ message: "Season not found" });
@@ -90,6 +124,12 @@ export async function editSeason(req, res, next) {
 
     res.json(updated);
   } catch (e) {
+    if (e?.code === "23505") {
+      return res.status(409).json({
+        message: "Season name already exists",
+      });
+    }
+
     next(e);
   }
 }
