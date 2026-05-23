@@ -45,6 +45,8 @@ const { data: varComponents = [], isLoading: loadingVC } = useQuery({
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
   const [riskLoading, setRiskLoading] = useState(false);
+  const [rulesError, setRulesError] = useState("");
+  const [riskMode, setRiskMode] = useState("analyze");
   const [riskResult, setRiskResult] = useState(null);
   const [showRiskModal, setShowRiskModal] = useState(false);
   const [aiRecommendedPrices, setAiRecommendedPrices] = useState({});
@@ -140,7 +142,8 @@ useEffect(() => {
     try { return JSON.parse(compData); } catch (e) { return []; }
   };
 
-const handleAnalyzePricing = async (productId, product) => {
+const handleAnalyzePricing = async (productId, product, mode = "analyze") => {
+  setRiskMode(mode);
   setRiskLoading(true);
   setRiskResult(null);
   setError("");
@@ -378,25 +381,52 @@ const confirmDelete = async () => {
     );
   }
 };
-
 const handleSaveRules = async () => {
+  // Prevent duplicate rule types being assigned together (safety net)
+  const selectedRuleObjs = tempSelectedRules
+    .map((id) => pricingRules.find((r) => r.id === id))
+    .filter(Boolean);
+
+  const seenTypes = new Set();
+  for (const r of selectedRuleObjs) {
+    if (seenTypes.has(r.type)) {
+      setRulesError(`Duplicate "${r.type}" rules are not allowed.`);
+      return;
+    }
+    seenTypes.add(r.type);
+  }
+
   const targetType = selectedProduct ? "products" : "categories";
   const targetId = selectedProduct ? selectedProduct.id : selectedCategory.id;
+
+  // Capture what we need before closing the modal
+  const productForAnalysis = selectedProduct;
+  const categoryIdForFeedback = selectedProduct
+    ? selectedProduct.category_id
+    : selectedCategory.id;
+  const assignedCount = tempSelectedRules.length;
 
   try {
     await api.put(`/products/${targetType}/${targetId}/rules`, {
       rules: tempSelectedRules,
     });
 
-  if (selectedProduct) await handleAnalyzePricing(selectedProduct.id, selectedProduct);
-
+    // Close the rules modal FIRST so the risk modal's loading is visible
     setShowRulesModal(false);
+    setRulesError("");
 
     showFeedback(
       "success",
-      "Pricing rules assigned successfully.",
-      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
+      assignedCount >= 1
+        ? "Pricing rules assigned successfully."
+        : "Pricing rules cleared successfully.",
+      `category-${categoryIdForFeedback}`
     );
+
+    // Now run the analysis — its "updating" modal renders on top
+    if (productForAnalysis) {
+      await handleAnalyzePricing(productForAnalysis.id, productForAnalysis, "update");
+    }
 
     setTimeout(async () => {
       await invalidate();
@@ -405,12 +435,10 @@ const handleSaveRules = async () => {
     showFeedback(
       "danger",
       err.response?.data?.error || err.message || "Error saving rules.",
-      selectedProduct ? `category-${selectedProduct.category_id}` : `category-${selectedCategory.id}`
+      `category-${categoryIdForFeedback}`
     );
   }
 };
-
-
 /*
 const handleRenameCategory = async (cat) => {
   const newName = prompt("Enter new category name:", cat.name);
@@ -631,6 +659,7 @@ const handleDeleteCategory = async () => {
         setSelectedCategory(cat);
         setSelectedProduct(null);
         setTempSelectedRules((cat.rules || []).map((rule) => rule.id));
+         setRulesError("");  
         setShowRulesModal(true);
       }}
     >
@@ -789,6 +818,7 @@ const handleDeleteCategory = async () => {
             setSelectedProduct({ ...prod, components: comps });
             setSelectedCategory(null);
             setTempSelectedRules((prod.rules || []).map((rule) => rule.id));
+             setRulesError(""); 
             setShowRulesModal(true);
           }}
         >
@@ -849,17 +879,23 @@ const handleDeleteCategory = async () => {
     <div style={riskModalContent}>
       <h2 style={modalTitleCustom}>Pricing Analysis</h2>
 
-      {riskLoading && (
-        <div style={riskLoadingBox}>
-          <Spinner animation="border" size="sm" variant="primary" />
-          <div>
-            <strong>Analyzing pricing risk...</strong>
-            <p style={{ margin: 0 }}>
-              PriceWise is calculating costs, rules, market position, and AI recommendation.
-            </p>
-          </div>
-        </div>
-      )}
+     {riskLoading && (
+  <div style={riskLoadingBox}>
+    <Spinner animation="border" size="sm" variant="primary" />
+    <div>
+      <strong>
+        {riskMode === "update"
+          ? "The pricing analysis is updating..."
+          : "Analyzing the pricing..."}
+      </strong>
+      <p style={{ margin: 0 }}>
+        {riskMode === "update"
+          ? "Applying the new rules and recalculating the recommended price."
+          : "PriceWise is calculating costs, rules, market position, and AI recommendation."}
+      </p>
+    </div>
+  </div>
+)}
 
       {!riskLoading && riskResult && (
         <>
@@ -1593,19 +1629,47 @@ const handleDeleteCategory = async () => {
           <div style={modalContentCustom}>
             <h2 style={modalTitleCustom}>Pricing Rules</h2>
 
+            {rulesError && (
+  <Alert
+    variant="warning"
+    onClose={() => setRulesError("")}
+    dismissible
+    style={getFeedbackStyle("warning")}
+  >
+    {rulesError}
+  </Alert>
+)}
+
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
-              {pricingRules.map((rule) => (
+  {pricingRules.map((rule) => (
   <div
     key={rule.id}
     style={ruleCardStyle(tempSelectedRules.includes(rule.id))}
     onClick={() => {
-      setTempSelectedRules((prev) =>
-        prev.includes(rule.id)
-          ? prev.filter((id) => id !== rule.id)
-          : [...prev, rule.id]
-      );
+      setRulesError("");
+      const isSelected = tempSelectedRules.includes(rule.id);
+
+      // Deselecting is always allowed
+      if (isSelected) {
+        setTempSelectedRules((prev) => prev.filter((id) => id !== rule.id));
+        return;
+      }
+
+      // Selecting: prevent a second rule of the same type
+      const conflict = tempSelectedRules
+        .map((id) => pricingRules.find((r) => r.id === id))
+        .find((r) => r && r.type === rule.type);
+
+      if (conflict) {
+        setRulesError(
+          `You can only assign one "${rule.type}" rule at a time. "${conflict.name}" is already selected — deselect it first.`
+        );
+        return;
+      }
+
+      setTempSelectedRules((prev) => [...prev, rule.id]);
     }}
   >
     <input
@@ -1614,9 +1678,7 @@ const handleDeleteCategory = async () => {
       readOnly
     />
     <div style={{ marginLeft: "10px" }}>
-      <div style={{ fontWeight: "bold", fontSize: "14px" }}>
-        {rule.name}
-      </div>
+      <div style={{ fontWeight: "bold", fontSize: "14px" }}>{rule.name}</div>
       <div style={{ fontSize: "11px", color: "#888" }}>
         {rule.type} - {rule.value}
       </div>
@@ -1625,18 +1687,17 @@ const handleDeleteCategory = async () => {
 ))}
             </div>
 
-            <div style={modalFooterCustom}>
-             
-              <button
-                style={btnCancelCustom}
-                onClick={() => setShowRulesModal(false)}
-              >
-                Cancel
-              </button>
-               <button style={btnSaveCustom} onClick={handleSaveRules}>
-                Assign Rules
-              </button>
-            </div>
+           <div style={modalFooterCustom}>
+  <button
+    style={btnCancelCustom}
+    onClick={() => setShowRulesModal(false)}
+  >
+    Cancel
+  </button>
+  <button style={btnSaveCustom} onClick={handleSaveRules}>
+    {tempSelectedRules.length >= 1 ? "Assign Rules" : "Save"}
+  </button>
+</div>
           </div>
         </div>
       )}
