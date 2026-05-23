@@ -24,7 +24,12 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+app.options("*", cors());
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -43,13 +48,6 @@ app.use("/api/sales-data", salesDataRoutes);
 app.use("/api/salesData", salesDataRoutes);
 app.use("/api/pricing-rules", pricingRuleRoutes);
 app.use("/api/chatbot", chatbotRoutes);
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.options('*', cors()); // handle preflight requests
 
 app.use(errorHandler);
 
