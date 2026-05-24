@@ -525,6 +525,55 @@ export async function getFixedCostAllocationContext(userId) {
   };
 }
 
+function calculateEffectiveFixedCostShare({
+  componentCost,
+  rawFixedCostShare,
+  competitorAveragePrice,
+  minimumMargin,
+}) {
+  const safeComponentCost = toNumber(componentCost, 0);
+  const safeRawShare = toNumber(rawFixedCostShare, 0);
+  const marketPrice = toNumber(competitorAveragePrice, 0);
+  const marginPercent = toNumber(minimumMargin, 0);
+
+  if (safeRawShare <= 0) {
+    return {
+      effective_fixed_cost_share: 0,
+      uncovered_fixed_cost_share: 0,
+      fixed_cost_share_capped: false,
+      fixed_cost_cap_reason: "",
+    };
+  }
+
+  if (marketPrice <= 0 || marginPercent >= 100) {
+    return {
+      effective_fixed_cost_share: safeRawShare,
+      uncovered_fixed_cost_share: 0,
+      fixed_cost_share_capped: false,
+      fixed_cost_cap_reason: "",
+    };
+  }
+
+  const maxPricingCostAtMarket =
+    marginPercent > 0 ? marketPrice * (1 - marginPercent / 100) : marketPrice;
+  const maxFixedShareAtMarket = Math.max(
+    0,
+    maxPricingCostAtMarket - safeComponentCost
+  );
+  const effectiveShare = Math.min(safeRawShare, maxFixedShareAtMarket);
+  const uncoveredShare = Math.max(0, safeRawShare - effectiveShare);
+
+  return {
+    effective_fixed_cost_share: Number(effectiveShare.toFixed(2)),
+    uncovered_fixed_cost_share: Number(uncoveredShare.toFixed(2)),
+    fixed_cost_share_capped: uncoveredShare > 0,
+    fixed_cost_cap_reason:
+      uncoveredShare > 0
+        ? "Full fixed cost allocation would push the price above the market-supported range."
+        : "",
+  };
+}
+
 export async function buildProductPricingAnalysisInput(userId, productId) {
   const product = await getProductById(userId, productId);
 
@@ -584,11 +633,10 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
   const totalComponentCost = toNumber(componentCostResult.total_component_cost, 0);
   const storedBaseCost = toNumber(product.b_cost, 0);
   const baseCost = totalComponentCost;
-  const fixedCostShare = toNumber(
+  const rawFixedCostShare = toNumber(
     fixedCostAllocation.fixed_cost_share_per_unit,
     0
   );
-  const pricingCost = baseCost + fixedCostShare;
   const currentPrice = toNumber(product.c_price, 0);
 
   const competitorFromMarket = toNumber(marketResult.average_market_price, 0);
@@ -604,6 +652,18 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     ? competitorFromProduct
     : 0;
 
+  const minimumMargin = minimumMarginRule
+    ? toNumber(minimumMarginRule.value, 0)
+    : 0;
+  const fixedCostShareResult = calculateEffectiveFixedCostShare({
+    componentCost: baseCost,
+    rawFixedCostShare,
+    competitorAveragePrice,
+    minimumMargin,
+  });
+  const fixedCostShare = fixedCostShareResult.effective_fixed_cost_share;
+  const pricingCost = baseCost + fixedCostShare;
+
   return {
     id: product.id,
     product_id: product.id,
@@ -616,6 +676,10 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     base_cost: baseCost,
     component_cost: totalComponentCost,
     fixed_cost_share: fixedCostShare,
+    raw_fixed_cost_share: rawFixedCostShare,
+    uncovered_fixed_cost_share:
+      fixedCostShareResult.uncovered_fixed_cost_share,
+    fixed_cost_share_capped: fixedCostShareResult.fixed_cost_share_capped,
     pricing_cost: pricingCost,
     stored_base_cost: storedBaseCost,
 
@@ -629,9 +693,7 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     target_margin: targetMarginRule
       ? toNumber(targetMarginRule.value, null)
       : null,
-    minimum_margin: minimumMarginRule
-      ? toNumber(minimumMarginRule.value, 0)
-      : 0,
+    minimum_margin: minimumMargin,
 
     season: activeSeason?.season_name || "Unknown",
     active_season: activeSeason || null,
@@ -641,7 +703,15 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     season_rules: activeSeasonRules,
 
     fixed_variable_cost_ratio: 0,
-    fixed_cost_allocation: fixedCostAllocation,
+    fixed_cost_allocation: {
+      ...fixedCostAllocation,
+      raw_fixed_cost_share_per_unit: rawFixedCostShare,
+      effective_fixed_cost_share_per_unit: fixedCostShare,
+      uncovered_fixed_cost_share_per_unit:
+        fixedCostShareResult.uncovered_fixed_cost_share,
+      fixed_cost_share_capped: fixedCostShareResult.fixed_cost_share_capped,
+      fixed_cost_cap_reason: fixedCostShareResult.fixed_cost_cap_reason,
+    },
 
     components: componentCostResult.components,
     market_rows: marketResult.market_rows,

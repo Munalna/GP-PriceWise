@@ -46,10 +46,12 @@ Generate a price that is:
 
 Cost definitions:
   component_cost = ingredient/recipe cost only.
-  fixed_cost_share = allocated fixed cost per sold unit.
+  raw_fixed_cost_share = full allocated fixed cost per sold unit.
+  fixed_cost_share = market-capped fixed cost share used for pricing.
   base_cost = component_cost + fixed_cost_share.
   pricing_cost is the same value as base_cost and is included for compatibility.
   If fixed_cost_share is 0, fixed cost allocation was not applied.
+  If fixed_cost_share_capped is true, do not force the product to recover all fixed costs through an unrealistic menu price.
   Your job is to ensure recommended_price never falls below:
   price_floor = base_cost / (1 - minimum_margin%)
 
@@ -103,6 +105,9 @@ ${JSON.stringify(
     current_price: productInput.current_price,
     component_cost: productInput.component_cost,
     fixed_cost_share: productInput.fixed_cost_share,
+    raw_fixed_cost_share: productInput.raw_fixed_cost_share,
+    uncovered_fixed_cost_share: productInput.uncovered_fixed_cost_share,
+    fixed_cost_share_capped: productInput.fixed_cost_share_capped,
     base_cost: productInput.pricing_cost,
     pricing_cost: productInput.pricing_cost,
     minimum_margin: productInput.minimum_margin,

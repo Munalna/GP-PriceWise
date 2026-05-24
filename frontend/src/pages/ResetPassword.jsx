@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Spinner, InputGroup } from 'react-bootstrap';
 import { supabase } from '../supabaseClient';
 import '../components/layout/Layout.css';
 
@@ -13,6 +13,8 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [recoveryReady, setRecoveryReady] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -171,29 +173,83 @@ const ResetPassword = () => {
 
                   <Form onSubmit={handleSubmit}>
                     <Form.Group className="mb-3">
-                      <Form.Label className="signup-label">New Password</Form.Label>
-                      <Form.Control
-                        type="password"
-                        value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        disabled={loading || checkingSession || !recoveryReady}
-                        className="signup-input"
-                        placeholder="Minimum 8 characters"
-                        maxLength={128}
-                      />
+                      <Form.Label className="signup-label">
+                        New Password <span className="text-danger">*</span>
+                      </Form.Label>
+                      <InputGroup>
+                        <Form.Control
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(event) => setNewPassword(event.target.value)}
+                          disabled={loading || checkingSession || !recoveryReady}
+                          className="signup-input no-native-reveal"
+                          style={{ borderRight: 'none' }}
+                          placeholder="Minimum 8 characters"
+                          maxLength={128}
+                        />
+                        <Button
+                          variant="outline-secondary"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          disabled={loading || checkingSession || !recoveryReady}
+                          style={{
+                            borderLeft: 'none',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '0 10px 10px 0',
+                            backgroundColor: 'white',
+                            color: '#6f7478ff',
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.backgroundColor = '#f8f9fa';
+                            event.currentTarget.style.color = '#7B4B94';
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.backgroundColor = 'white';
+                            event.currentTarget.style.color = '#6f7478ff';
+                          }}
+                        >
+                          <i className={`bi ${showNewPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                        </Button>
+                      </InputGroup>
                     </Form.Group>
 
                     <Form.Group className="mb-4">
-                      <Form.Label className="signup-label">Confirm Password</Form.Label>
-                      <Form.Control
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        disabled={loading || checkingSession || !recoveryReady}
-                        className="signup-input"
-                        placeholder="Re-enter new password"
-                        maxLength={128}
-                      />
+                      <Form.Label className="signup-label">
+                        Confirm Password <span className="text-danger">*</span>
+                      </Form.Label>
+                      <InputGroup>
+                        <Form.Control
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(event) => setConfirmPassword(event.target.value)}
+                          disabled={loading || checkingSession || !recoveryReady}
+                          className="signup-input no-native-reveal"
+                          style={{ borderRight: 'none' }}
+                          placeholder="Re-enter new password"
+                          maxLength={128}
+                        />
+                        <Button
+                          variant="outline-secondary"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          disabled={loading || checkingSession || !recoveryReady}
+                          style={{
+                            borderLeft: 'none',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '0 10px 10px 0',
+                            backgroundColor: 'white',
+                            color: '#6f7478ff',
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.backgroundColor = '#f8f9fa';
+                            event.currentTarget.style.color = '#7B4B94';
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.backgroundColor = 'white';
+                            event.currentTarget.style.color = '#6f7478ff';
+                          }}
+                        >
+                          <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                        </Button>
+                      </InputGroup>
                     </Form.Group>
 
                     <Button

@@ -133,6 +133,41 @@ useEffect(() => {
 
   const formatNum = (val) => parseFloat(Number(val).toFixed(4)).toString();
 
+  const getMinimumMargin = (product, category) => {
+    const allRules = [
+      ...(product?.rules || []),
+      ...(category?.rules || []),
+    ];
+
+    const rule = allRules.find(
+      (item) => String(item?.type || "").toLowerCase() === "minimum margin"
+    );
+
+    return Number(rule?.value) || 0;
+  };
+
+  const getEffectiveFixedCostShare = ({
+    variableCost,
+    rawFixedCostShare,
+    competitorAverage,
+    minimumMargin,
+  }) => {
+    const rawShare = Number(rawFixedCostShare) || 0;
+    const marketPrice = Number(competitorAverage) || 0;
+    const margin = Number(minimumMargin) || 0;
+
+    if (rawShare <= 0 || marketPrice <= 0 || margin >= 100) return rawShare;
+
+    const maxPricingCostAtMarket =
+      margin > 0 ? marketPrice * (1 - margin / 100) : marketPrice;
+    const maxFixedShareAtMarket = Math.max(
+      0,
+      maxPricingCostAtMarket - (Number(variableCost) || 0)
+    );
+
+    return Math.min(rawShare, maxFixedShareAtMarket);
+  };
+
   const handleCheckMarketProduct = async (name) => {
     if (!name || name.trim().length < 2) { setMarketCheck(null); return; }
     try {
@@ -579,14 +614,9 @@ const getComponentUnit = (item) => {
       )}
 
       {loading ? (
-        <div
-          className="d-flex align-items-center gap-2"
-          style={{ padding: "100px", justifyContent: "center" }}
-        >
-          <Spinner animation="border" size="sm" variant="primary" />
-          <span style={{ color: "#5b2d89", fontWeight: "600" }}>
-            Loading...
-          </span>
+        <div style={pageLoadingRow}>
+          <div style={pageSpinner} />
+          <span>Loading products...</span>
         </div>
       ) : (
         <>
@@ -760,7 +790,13 @@ const getComponentUnit = (item) => {
                      {[...cat.products].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((prod) => {
                         const comps = parseComponents(prod.components);
                         const variableCost = calculateTotalVcost(comps);
-                        const fixedCostShare = Number(prod.fixed_cost_share) || 0;
+                        const rawFixedCostShare = Number(prod.fixed_cost_share) || 0;
+                        const fixedCostShare = getEffectiveFixedCostShare({
+                          variableCost,
+                          rawFixedCostShare,
+                          competitorAverage: calculateAvg(prod.competitors_prices),
+                          minimumMargin: getMinimumMargin(prod, cat),
+                        });
                         const displayedBaseCost =
                           analyzedBaseCosts[prod.id] ?? variableCost + fixedCostShare;
                         return (
@@ -988,6 +1024,11 @@ setSelectedProduct({
             <p><strong>Base Cost:</strong> {formatNum(riskResult.cost.base_cost)} SAR</p>
             <p><strong>Component Cost:</strong> {formatNum(riskResult.cost.component_cost)} SAR</p>
             <p><strong>Fixed Cost Share:</strong> {formatNum(riskResult.cost.fixed_cost_share || 0)} SAR</p>
+            {riskResult.cost.fixed_cost_share_capped && (
+              <p style={{ color: "#92400e", fontWeight: 700 }}>
+                Full fixed cost share is {formatNum(riskResult.cost.raw_fixed_cost_share || 0)} SAR/unit, but only {formatNum(riskResult.cost.fixed_cost_share || 0)} SAR/unit was included because the full amount would make the price unrealistic versus the market. Uncovered fixed cost share: {formatNum(riskResult.cost.uncovered_fixed_cost_share || 0)} SAR/unit.
+              </p>
+            )}
             {!riskResult.cost.fixed_cost_allocation?.fixed_cost_allocation_applied && (
               <p style={{ color: "#92400e", fontWeight: 700 }}>
                 Fixed cost allocation not applied. Import sales data to allocate fixed costs automatically.
@@ -2159,6 +2200,22 @@ const emptyPlaceholderText = {
   color: "#999",
   fontStyle: "italic",
   fontSize: "14px",
+};
+
+const pageLoadingRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  color: "#475569",
+};
+
+const pageSpinner = {
+  width: 16,
+  height: 16,
+  borderRadius: "50%",
+  border: "2px solid #cbd5e1",
+  borderTopColor: "#382372",
+  animation: "spin 0.8s linear infinite",
 };
 
 const loadingStyle = {
