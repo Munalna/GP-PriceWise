@@ -358,7 +358,8 @@ const handleUpdateProduct = async () => {
     return showFeedback("danger", "Each selected component must have a quantity greater than 0.", "edit-product-modal");
   }
 
-  const updatedProductCategoryId = selectedProduct.category_id;
+  const updatedProductCategoryId =
+  selectedProduct.category_id || "uncategorized-drafts";
 
   try {
     await api.put(`/products/${selectedProduct.id}`, {
