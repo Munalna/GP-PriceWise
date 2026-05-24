@@ -211,7 +211,7 @@ export const createDraftProducts = async (req, res) => {
 };
 
 export const importSalesData = async (req, res) => {
-    const { mappedData, importPeriod } = req.body;
+    const { mappedData, importPeriod, ignoreMissingProducts = false } = req.body;
     const userId = req.user?.id;
     const payloadError = validateImportPayload(mappedData, userId);
 
@@ -233,7 +233,7 @@ export const importSalesData = async (req, res) => {
             .filter((name) => !productMap.has(productKey(name)))
             .map((name) => ({ name }));
 
-        if (missingProducts.length > 0) {
+        if (missingProducts.length > 0 && !ignoreMissingProducts) {
             return res.status(409).json({
                 error: 'Unregistered products detected in the file.',
                 missingProducts,
@@ -243,6 +243,7 @@ export const importSalesData = async (req, res) => {
 
         const salesRows = cleanedRows.map((row) => {
             const product = productMap.get(productKey(row.product_name));
+            if (!product) return null;
 
             return {
                 user_id: userId,
@@ -251,7 +252,15 @@ export const importSalesData = async (req, res) => {
                 total_price: row.total_price,
                 sale_date: row.sale_date,
             };
-        });
+        }).filter(Boolean);
+
+        if (salesRows.length === 0) {
+            return res.status(400).json({
+                error: 'No registered products found to import. Add drafts first or use products that already exist.',
+                missingProducts,
+                missingCount: missingProducts.length,
+            });
+        }
 
         const { error: salesDeleteError } = await client
             .from('sales_data')
@@ -274,6 +283,8 @@ export const importSalesData = async (req, res) => {
             newProductsAdded: false,
             newProductsCount: 0,
             newProducts: [],
+            skippedProducts: ignoreMissingProducts ? missingProducts : [],
+            skippedProductsCount: ignoreMissingProducts ? missingProducts.length : 0,
         });
     } catch (error) {
         console.error('Sales import error:', error);

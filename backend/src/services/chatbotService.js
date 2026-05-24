@@ -36,10 +36,12 @@ Fixed Costs:
 - For each cost: name, amount, period (Monthly / Quarterly / Yearly).
 - The system normalizes to a monthly equivalent:
   Monthly = as-is, Quarterly / 3, Yearly / 12.
-- In the final user-facing pricing analysis, fixed costs are included through Fixed Cost Share.
+- In the final user-facing pricing analysis, fixed costs are included through Fixed Cost Share when doing so remains market-realistic.
 - total_monthly_fixed_costs = sum of all fixed costs after monthly normalization.
 - estimated_monthly_units = sales_units_in_import x (30 / sales_period_days).
-- Fixed Cost Share = total_monthly_fixed_costs / estimated_monthly_units.
+- Raw Fixed Cost Share = total_monthly_fixed_costs / estimated_monthly_units.
+- Effective Fixed Cost Share is the portion used in product pricing.
+- If the raw fixed cost share would push the menu price far above the competitor average, the system caps the effective share and reports the uncovered fixed cost gap instead of recommending an unrealistic price.
 - Fixed Cost Share is calculated only when the user has fixed costs stored and imported sales data with usable sale dates.
 - If there is no fixed cost data or no usable sales data, Fixed Cost Share is 0 and fixed cost allocation is not applied.
 

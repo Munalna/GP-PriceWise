@@ -63,10 +63,11 @@ export default function ImportSales({ userId, onSuccess }) {
         reader.readAsBinaryString(file);
     };
 
-    const submitImport = async (mappedData) => {
+    const submitImport = async (mappedData, options = {}) => {
         const response = await api.post('/salesData/import', {
             mappedData,
             importPeriod: dateCol ? 'dates' : filePeriod,
+            ignoreMissingProducts: options.ignoreMissingProducts || false,
         });
 
         setImportResult(response.data);
@@ -127,7 +128,7 @@ export default function ImportSales({ userId, onSuccess }) {
 
             await submitImport(pendingMappedData);
             setAlertMessage(
-                'Import successful. Draft products were added to Products. Please complete their components and details.'
+                'Import completed. New products were added as drafts in Products, so their sales are included now. Please complete their components and pricing details later.'
             );
             setShowMissingModal(false);
             setMissingProducts([]);
@@ -142,10 +143,33 @@ export default function ImportSales({ userId, onSuccess }) {
         }
     };
 
-    const handleCancelMissingProducts = () => {
+    const handleImportWithoutDrafts = async () => {
+        try {
+            setImporting(true);
+            setAlertMessage('');
+            setSuccessMessage('');
+
+            const skippedCount = missingProducts.length;
+            await submitImport(pendingMappedData, { ignoreMissingProducts: true });
+
+            setAlertMessage(
+                `Import completed for registered products only. ${skippedCount} unregistered product${skippedCount === 1 ? '' : 's'} were skipped, so their sales are not included in analytics or reports.`
+            );
+            setShowMissingModal(false);
+            setMissingProducts([]);
+            setPendingMappedData([]);
+        } catch (error) {
+            const backendMessage = error.response?.data?.error || error.response?.data || error.message;
+            console.error('Import without drafts error:', backendMessage, error);
+            setSuccessMessage('');
+            setAlertMessage(`Import failed: ${backendMessage}`);
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    const handleCloseMissingProducts = () => {
         setShowMissingModal(false);
-        setSuccessMessage('');
-        setAlertMessage('Import cancelled. No draft products were created.');
     };
 
     const alertType = alertMessage.includes('cancelled')
@@ -309,13 +333,17 @@ export default function ImportSales({ userId, onSuccess }) {
                 </div>
             )}
 
-            <Modal show={showMissingModal} onHide={handleCancelMissingProducts} centered>
+            <Modal show={showMissingModal} onHide={handleCloseMissingProducts} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Unregistered Products</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <p className="mb-3">
-                        Unregistered products detected in the file. Would you like to add them as drafts to proceed with the import?
+                        We found {missingProducts.length} product{missingProducts.length === 1 ? '' : 's'} in this POS file that are not registered in PriceWise yet.
+                    </p>
+                    <p className="mb-3">
+                        Choose <strong>Add Drafts & Import All</strong> to create those products as drafts and include their sales now.
+                        Choose <strong>Import Existing Products Only</strong> to skip those product rows and import sales for products that already exist.
                     </p>
                     <div className="sales-missing-products">
                         {missingProducts.map((product) => (
@@ -326,11 +354,11 @@ export default function ImportSales({ userId, onSuccess }) {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCancelMissingProducts} disabled={drafting}>
-                        Cancel Import
+                    <Button variant="secondary" onClick={handleImportWithoutDrafts} disabled={drafting || importing}>
+                        {importing ? 'Importing...' : 'Import Existing Products Only'}
                     </Button>
-                    <Button variant="primary" onClick={handleDraftAndImport} disabled={drafting}>
-                        {drafting ? 'Adding Drafts...' : 'Add Drafts & Import'}
+                    <Button variant="primary" onClick={handleDraftAndImport} disabled={drafting || importing}>
+                        {drafting ? 'Adding Drafts...' : 'Add Drafts & Import All'}
                     </Button>
                 </Modal.Footer>
             </Modal>

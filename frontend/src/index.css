@@ -58,3 +58,9 @@ code {
 .help-icon:hover {
   background: #e5ddff !important;
 }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
