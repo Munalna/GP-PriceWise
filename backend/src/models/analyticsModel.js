@@ -1,4 +1,10 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import {
+  getNameAnchor,
+  hasImportantTokenOverlap,
+  MARKET_MATCH_THRESHOLD as SHARED_MARKET_MATCH_THRESHOLD,
+  marketNameSimilarity,
+} from "../utils/marketMatching.js";
 
 const SALES_TABLE = "sales_data";
 const PRODUCTS_TABLE = "products";
@@ -23,89 +29,10 @@ export async function checkProductInMarketDataset(productName) {
   const matches = (data || []).filter(
   (row) =>
     hasImportantTokenOverlap(row.itemname, productName) &&
-    marketNameSimilarity(row.itemname, productName) >= MARKET_MATCH_THRESHOLD
+    marketNameSimilarity(row.itemname, productName) >= SHARED_MARKET_MATCH_THRESHOLD
 );
   return { exists: matches.length > 0, matches };
 }
-
-/* ---- Fuzzy market-name matching helpers ---- */
-function normalizeMarketName(s = "") {
-  return String(s)
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove diacritics
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s]/g, " ")   // strip punctuation
-    .replace(/\bice\b/g, "iced")     // ice -> iced
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w)) // singular/plural
-    .sort()                           // ignore word order
-    .join(" ");
-}
-
-function levenshteinRatio(a = "", b = "") {
-  const m = a.length, n = b.length;
-  if (m === 0 || n === 0) return m === n ? 1 : 0;
-  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-  for (let j = 0; j <= n; j++) d[0][j] = j;
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      d[i][j] = Math.min(
-        d[i - 1][j] + 1,
-        d[i][j - 1] + 1,
-        d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-  return 1 - d[m][n] / Math.max(m, n);
-}
-
-function marketNameSimilarity(a, b) {
-  const x = normalizeMarketName(a);
-  const y = normalizeMarketName(b);
-  if (!x || !y) return 0;
-  if (x === y) return 1;
-  const sx = new Set(x.split(" "));
-  const sy = new Set(y.split(" "));
-  const inter = [...sx].filter((t) => sy.has(t)).length;
-  const union = new Set([...sx, ...sy]).size;
-  const jaccard = union ? inter / union : 0; // tolerates extra words
-  return Math.max(jaccard, levenshteinRatio(x, y)); // + tolerates typos
-}
-
-function getNameAnchor(name) {
-  const tokens = normalizeMarketName(name).split(" ").filter(Boolean);
-  if (tokens.length === 0) return String(name || "").trim();
-  return tokens.sort((a, b) => b.length - a.length)[0]; // longest = key word
-}
-
-
-function hasImportantTokenOverlap(a, b) {
-  const stopWords = new Set([
-    "hot",
-    "iced",
-    "ice",
-    "drink",
-    "coffee",
-  ]);
-  const ax = normalizeMarketName(a)
-    .split(" ")
-    .filter((t) => !stopWords.has(t));
-  const bx = normalizeMarketName(b)
-    .split(" ")
-    .filter((t) => !stopWords.has(t));
-  const overlap = ax.filter((token) => bx.includes(token));
-  // If product names are short, allow 1 strong overlap
-  if (Math.min(ax.length, bx.length) <= 2) {
-    return overlap.length >= 1;
-  }
-  // Longer names require stronger overlap
-  return overlap.length >= 2;
-}
-
-const MARKET_MATCH_THRESHOLD = 0.7; // 0.5–0.7 to tune strictness
-
-
 
 function getDbClient() {
   if (!supabaseAdmin) {
@@ -198,7 +125,7 @@ function getAverageFromCompetitorsPrices(competitorsPrices) {
   return getAverage(prices);
 }
 
-async function getVariableComponentsCostFromProductText(userId, productComponentsText) {
+async function getComponentsCostFromProductText(userId, productComponentsText) {
   const db = getDbClient();
 
   const parsedComponents = parseJsonArray(productComponentsText);
@@ -211,25 +138,28 @@ async function getVariableComponentsCostFromProductText(userId, productComponent
   }
 
   const { data, error } = await db
-    .from("variable_components")
+    .from("components")
     .select("id, name, cost_per_unit, unit")
-    .eq("owner_id", userId);
+    .eq("user_id", userId);
 
   if (error) throw error;
 
-  const variableComponents = data || [];
+  const components = data || [];
 
   const total = parsedComponents.reduce((sum, item) => {
     const componentName = item.name;
     const quantity = toNumber(item.qty ?? item.quantity, 0);
 
-    const dbComponent = variableComponents.find(
+    const dbComponent = components.find(
       (component) =>
         String(component.name).toLowerCase().trim() ===
         String(componentName).toLowerCase().trim()
     );
 
-    const unitCost = toNumber(dbComponent?.cost_per_unit, 0);
+    const unitCost = toNumber(
+      dbComponent?.cost_per_unit ?? item.cost_per_unit,
+      0
+    );
 
     return sum + quantity * unitCost;
   }, 0);
@@ -354,7 +284,7 @@ export async function getMarketPricesByProductName(productName, categoryName) {
   const db = getDbClient();
   const anchor = getNameAnchor(productName); // e.g. "Iced Matcha Latte" -> "matcha"
 
-  const fetchCandidates = async (useCategory) => {
+  const fetchPrimaryCandidates = async (useCategory) => {
     let query = db
       .from(MARKET_TABLE)
       .select(
@@ -370,14 +300,43 @@ export async function getMarketPricesByProductName(productName, categoryName) {
     if (error) throw error;
    return (data || []).filter(
   (row) =>
-    marketNameSimilarity(row.itemname, productName) >= MARKET_MATCH_THRESHOLD &&
+    marketNameSimilarity(row.itemname, productName) >=
+      SHARED_MARKET_MATCH_THRESHOLD &&
     hasImportantTokenOverlap(row.itemname, productName)
 );
   };
 
+  const fetchSecondaryCandidates = async () => {
+    const { data, error } = await db
+      .from("market_dataset")
+      .select("product_name, price")
+      .ilike("product_name", `%${anchor}%`)
+      .limit(200);
+
+    if (error) throw error;
+
+    return (data || [])
+      .filter(
+        (row) =>
+          marketNameSimilarity(row.product_name, productName) >=
+            SHARED_MARKET_MATCH_THRESHOLD &&
+          hasImportantTokenOverlap(row.product_name, productName)
+      )
+      .map((row) => ({
+        itemname: row.product_name,
+        price: row.price,
+        source: "market_dataset",
+      }));
+  };
+
   // try with category first, then without if it filtered everything out
-  let marketRows = await fetchCandidates(true);
-  if (marketRows.length === 0) marketRows = await fetchCandidates(false);
+  let primaryRows = await fetchPrimaryCandidates(true);
+  if (primaryRows.length === 0) {
+    primaryRows = await fetchPrimaryCandidates(false);
+  }
+
+  const secondaryRows = await fetchSecondaryCandidates();
+  const marketRows = [...primaryRows, ...secondaryRows];
 
   const prices = marketRows
     .map((row) => toNumber(row.price, 0))
@@ -590,7 +549,7 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
     fixedCostAllocation,
   ] = await Promise.all([
     getProductComponentsCost(product.id),
-    getVariableComponentsCostFromProductText(userId, product.components),
+    getComponentsCostFromProductText(userId, product.components),
     getMarketPricesByProductName(product.name, categoryName),
     getAssignedPricingRules(userId, product.id, product.category_id),
     getActiveSeason(userId),
@@ -626,9 +585,9 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
   );
 
   const componentCostResult =
-    componentCostFromRelation.total_component_cost > 0
-      ? componentCostFromRelation
-      : componentCostFromText;
+    componentCostFromText.components.length > 0
+      ? componentCostFromText
+      : componentCostFromRelation;
 
   const totalComponentCost = toNumber(componentCostResult.total_component_cost, 0);
   const storedBaseCost = toNumber(product.b_cost, 0);
@@ -643,14 +602,14 @@ export async function buildProductPricingAnalysisInput(userId, productId) {
   const competitorFromList = getAverageFromCompetitorsPrices(product.competitors_prices);
   const competitorFromProduct = toNumber(product.comp_price, 0);
 
- const competitorAveragePrice =
-  competitorFromList > 0
-    ? competitorFromList
-    : competitorFromMarket > 0
-    ? competitorFromMarket
-    : competitorFromProduct > 0
-    ? competitorFromProduct
-    : 0;
+  const competitorAveragePrice =
+    competitorFromMarket > 0
+      ? competitorFromMarket
+      : competitorFromList > 0
+      ? competitorFromList
+      : competitorFromProduct > 0
+      ? competitorFromProduct
+      : 0;
 
   const minimumMargin = minimumMarginRule
     ? toNumber(minimumMarginRule.value, 0)

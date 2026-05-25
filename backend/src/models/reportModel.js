@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import { isMarketNameMatch } from "../utils/marketMatching.js";
 
 const SALES_TABLE = "sales_data";
 
@@ -25,9 +26,9 @@ export async function getCategoriesWithProductsByUser(userId) {
 
   // Fetch variable components to look up cost by name
   const { data: variableComponents } = await supabaseAdmin
-    .from("variable_components")
+    .from("components")
     .select("*")
-    .eq("owner_id", userId);
+    .eq("user_id", userId);
 
   // Build lookup map by name (lowercase)
   const vcMap = {};
@@ -48,7 +49,6 @@ export async function getCategoriesWithProductsByUser(userId) {
   const enriched = (categories || []).map((cat) => ({
     ...cat,
     products: (cat.products || []).map((prod) => {
-      const searchName = prod.name?.trim().toLowerCase();
 
       // ── Parse components JSON string ──────────────────────
       let componentsList = [];
@@ -70,12 +70,16 @@ export async function getCategoriesWithProductsByUser(userId) {
 
       // ── Avg competitor price from market datasets ─────────
       const prices1 = marketData1
-        .filter((i) => i.itemname?.trim().toLowerCase() === searchName)
-        .map((i) => Number(i.price));
+        .filter((i) => i.itemname && isMarketNameMatch(i.itemname, prod.name))
+        .map((i) => Number(i.price))
+        .filter((price) => Number.isFinite(price));
 
       const prices2 = marketData2
-        .filter((i) => i.product_name?.trim().toLowerCase() === searchName)
-        .map((i) => Number(i.price));
+        .filter(
+          (i) => i.product_name && isMarketNameMatch(i.product_name, prod.name)
+        )
+        .map((i) => Number(i.price))
+        .filter((price) => Number.isFinite(price));
 
       const allPrices = [...prices1, ...prices2];
       const avgCompetitorPrice =

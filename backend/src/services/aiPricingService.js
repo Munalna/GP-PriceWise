@@ -72,6 +72,10 @@ Strict pricing logic:
 5) Final recommendation must be practical, not mathematically extreme.
 6) Avoid unrealistic jumps (example: 12 SAR -> 48 SAR).
 7) Recommended price should make business sense.
+8) minimum_margin changes the price_floor, not necessarily the final recommendation.
+   If competitor_average_price is already above the new price_floor, the recommended_price may stay the same.
+   Example: price_floor moves from 14.29 to 16.13 SAR, but competitor_average_price is 25 SAR; recommended_price can remain 25 SAR.
+   Explain this clearly in the reason and margin_safety_explanation when it happens.
 
 Pricing rule meanings:
 - minimum_margin = minimum required margin % (covers fixed costs + minimum profit)
@@ -96,6 +100,7 @@ Determine whether the business should:
 - increase price
 - decrease price
 - maintain price
+If minimum_margin is assigned, mention whether it is actively driving the recommendation or only confirming that the market-based price is safely above price_floor.
 
 Product data:
 ${JSON.stringify(

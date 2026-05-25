@@ -8,8 +8,18 @@ import '../components/sales/SalesDashboard.css';
 export default function Dashboard() {
     const { user, loading } = useAuth();
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [latestFileUnits, setLatestFileUnits] = useState(() => {
+        const savedUnits = window.localStorage.getItem('pricewise:lastFileUnits');
+        const parsedUnits = Number(savedUnits);
+        return Number.isFinite(parsedUnits) && parsedUnits > 0 ? parsedUnits : null;
+    });
 
-    const handleUploadSuccess = () => {
+    const handleUploadSuccess = (importResult) => {
+        const fileUnits = Number(importResult?.totalFileUnits ?? importResult?.importedUnits);
+        if (Number.isFinite(fileUnits) && fileUnits >= 0) {
+            setLatestFileUnits(fileUnits);
+            window.localStorage.setItem('pricewise:lastFileUnits', String(fileUnits));
+        }
         setRefreshTrigger(prev => prev + 1);
     };
 
@@ -51,7 +61,12 @@ export default function Dashboard() {
             </section>
 
             <section className="dashboard-card">
-                <Analytics key={refreshTrigger} userId={user.id} />
+                <Analytics
+                    key={refreshTrigger}
+                    userId={user.id}
+                    refreshToken={refreshTrigger}
+                    importedUnitsOverride={latestFileUnits}
+                />
             </section>
         </div>
     );

@@ -40,7 +40,7 @@ function ProductAxisTick({ x, y, payload }) {
     );
 };
 
-export default function Analytics({ userId }) {
+export default function Analytics({ userId, refreshToken = 0, importedUnitsOverride = null }) {
     const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -54,7 +54,13 @@ export default function Analytics({ userId }) {
         setLoading(true);
         setError('');
 
-        api.get('/salesData/analytics')
+        api.get('/salesData/analytics', {
+            params: { refresh: refreshToken, t: Date.now() },
+            headers: {
+                'Cache-Control': 'no-cache',
+                Pragma: 'no-cache',
+            },
+        })
             .then(res => {
                 const normalizedData = Array.isArray(res.data)
                     ? res.data
@@ -81,13 +87,18 @@ export default function Analytics({ userId }) {
             .finally(() => {
                 setLoading(false);
             });
-    }, [userId]);
+    }, [userId, refreshToken]);
 
     const bestSelling = useMemo(() => chartData.slice(0, 5), [chartData]);
     const lowSelling = useMemo(() => [...chartData].slice(-5).reverse(), [chartData]);
     const totalUnits = useMemo(
-        () => chartData.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
-        [chartData]
+        () => {
+            const override = Number(importedUnitsOverride);
+            if (Number.isFinite(override) && override >= 0) return override;
+
+            return chartData.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        },
+        [chartData, importedUnitsOverride]
     );
     const topProduct = bestSelling[0];
     const lowProduct = lowSelling[0];
@@ -129,7 +140,7 @@ export default function Analytics({ userId }) {
 
             <div className="sales-kpi-grid">
                 <div className="sales-kpi-card">
-                    <span>Total units</span>
+                    <span>Imported units</span>
                     <strong>{totalUnits.toLocaleString()}</strong>
                 </div>
                 <div className="sales-kpi-card">

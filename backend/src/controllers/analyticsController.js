@@ -203,6 +203,49 @@ function calculatePriceFloor(baseCost, minimumMargin) {
   );
 }
 
+function buildMinimumMarginExplanation(productInput, finalPrice, priceFloor) {
+  const minimumMargin = Number(productInput.minimum_margin) || 0;
+  const competitorAverage = Number(productInput.competitor_average_price) || 0;
+  const safeFinalPrice = Number(finalPrice) || 0;
+
+  if (minimumMargin <= 0) {
+    return "No minimum margin rule is assigned, so there is no margin-based price floor beyond the pricing cost.";
+  }
+
+  if (competitorAverage > 0 && competitorAverage >= priceFloor) {
+    return `Minimum margin ${minimumMargin}% sets a price floor of ${priceFloor.toFixed(
+      2
+    )} SAR. The competitor average is ${competitorAverage.toFixed(
+      2
+    )} SAR, which is already above that floor, so changing the minimum margin may not change the final recommendation unless the floor rises above the market price.`;
+  }
+
+  if (safeFinalPrice <= priceFloor) {
+    return `Minimum margin ${minimumMargin}% is actively driving the recommendation because it sets the price floor at ${priceFloor.toFixed(
+      2
+    )} SAR.`;
+  }
+
+  return `Minimum margin ${minimumMargin}% sets a price floor of ${priceFloor.toFixed(
+    2
+  )} SAR, and the final recommendation is safely above that floor.`;
+}
+
+function buildMinimumMarginReason(productInput, priceFloor) {
+  const minimumMargin = Number(productInput.minimum_margin) || 0;
+  const competitorAverage = Number(productInput.competitor_average_price) || 0;
+
+  if (minimumMargin > 0 && competitorAverage > 0 && competitorAverage >= priceFloor) {
+    return `Minimum margin changes the price floor, but the market average (${competitorAverage.toFixed(
+      2
+    )} SAR) is already above the ${priceFloor.toFixed(
+      2
+    )} SAR floor, so the recommendation can remain market-based.`;
+  }
+
+  return "";
+}
+
 function roundUpToPriceEnding(price, ending) {
   const numericPrice = Number(price);
   const numericEnding = Number(ending);
@@ -419,12 +462,17 @@ export async function getAIPriceRecommendation(req, res, next) {
 
       const fallbackRecommendedPrice =
         buildFallbackRecommendedPrice(productInput);
+      const fallbackPriceFloor = calculatePriceFloor(
+        productInput.pricing_cost,
+        productInput.minimum_margin
+      );
+      const minimumMarginReason = buildMinimumMarginReason(
+        productInput,
+        fallbackPriceFloor
+      );
 
       aiRecommendation = {
-        price_floor: calculatePriceFloor(
-          productInput.pricing_cost,
-          productInput.minimum_margin
-        ),
+        price_floor: fallbackPriceFloor,
         recommended_price: fallbackRecommendedPrice,
         recommendation_type:
           fallbackRecommendedPrice > productInput.current_price
@@ -433,9 +481,14 @@ export async function getAIPriceRecommendation(req, res, next) {
             ? "decrease"
             : "maintain",
         reason:
+          minimumMarginReason ||
           "Generated using product cost, competitor pricing, and available pricing rules.",
         risk_explanation: analysis.short_reason,
-        margin_safety_explanation: `Current margin is ${analysis.applied_margin}%.`,
+        margin_safety_explanation: buildMinimumMarginExplanation(
+          productInput,
+          fallbackRecommendedPrice,
+          fallbackPriceFloor
+        ),
         action: analysis.recommendation,
         model: "fallback_rule_based",
       };
@@ -461,6 +514,25 @@ export async function getAIPriceRecommendation(req, res, next) {
         : ruleBasedResult.finalPrice < productInput.current_price
         ? "decrease"
         : "maintain";
+
+    const minimumMarginExplanation = buildMinimumMarginExplanation(
+      productInput,
+      ruleBasedResult.finalPrice,
+      ruleBasedResult.priceFloor
+    );
+    const minimumMarginReason = buildMinimumMarginReason(
+      productInput,
+      ruleBasedResult.priceFloor
+    );
+
+    aiRecommendation.margin_safety_explanation = minimumMarginExplanation;
+
+    if (minimumMarginReason && !aiRecommendation.reason?.includes(minimumMarginReason)) {
+      const originalReason = aiRecommendation.reason
+        ? `${aiRecommendation.reason} `
+        : "";
+      aiRecommendation.reason = `${originalReason}${minimumMarginReason}`;
+    }
 
     if (ruleBasedResult.appliedRules.length > 0) {
       const originalReason = aiRecommendation.reason

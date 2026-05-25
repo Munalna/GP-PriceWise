@@ -1,4 +1,5 @@
 import { supabase, supabaseAdmin } from "../config/supabase.js";
+import { isMarketNameMatch } from "../utils/marketMatching.js";
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -203,18 +204,17 @@ export const getAllProducts = async (userId) => {
       rules: categoryRules,
 
       products: (cat.products || []).map((prod) => {
-        const searchName = prod.name?.trim().toLowerCase();
-
         const prices1 = marketData1
           .filter(
-            (item) => item.itemname?.trim().toLowerCase() === searchName
+            (item) => item.itemname && isMarketNameMatch(item.itemname, prod.name)
           )
           .map((item) => Number(item.price))
           .filter((price) => Number.isFinite(price));
 
         const prices2 = marketData2
           .filter(
-            (item) => item.product_name?.trim().toLowerCase() === searchName
+            (item) =>
+              item.product_name && isMarketNameMatch(item.product_name, prod.name)
           )
           .map((item) => Number(item.price))
           .filter((price) => Number.isFinite(price));
