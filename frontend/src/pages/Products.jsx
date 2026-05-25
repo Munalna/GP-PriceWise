@@ -1014,10 +1014,14 @@ setSelectedProduct({
             </div>
           )}
 
-          <div style={{ ...riskCard, marginBottom: "20px" }}>
-            <strong>Risk Label</strong>
-            <p>{riskResult.analysis.risk_label}</p>
-          </div>
+    {/*
+  {Number(riskResult.product.current_price) > 0 && (
+    <div style={{ ...riskCard, marginBottom: "20px" }}>
+      <strong>Risk Label</strong>
+      <p>{riskResult.analysis.risk_label}</p>
+    </div>
+  )}
+*/}
 
           <div style={riskDetailsBox}>
             <p><strong>Current Price:</strong> {formatNum(riskResult.product.current_price)} SAR</p>
@@ -1039,25 +1043,40 @@ setSelectedProduct({
             )}
             <p><strong>Competitor Average:</strong> {formatNum(riskResult.market.competitor_average_price)} SAR</p>
           {/* <p><strong>Applied Margin:</strong> {riskResult.analysis.applied_margin}%</p> */}
-            <p><strong>Profit Per Unit:</strong> {formatNum(riskResult.analysis.profit_per_unit)} SAR</p>
           </div>
 
-          <div style={insightBox}>
-            <strong>Pricing Insight</strong>
-            <p>{riskResult.analysis.pricing_insight}</p>
-          </div>
+      {/*
+  {Number(riskResult.product.current_price) > 0 ? (
+    <>
+      <div style={insightBox}>
+        <strong>Pricing Insight</strong>
+        <p>{riskResult.analysis.pricing_insight}</p>
+      </div>
 
-          {riskResult.ai ? (
-            <div style={insightBox}>
-              <strong>AI Recommended Action</strong>
-              <p>{riskResult.ai.action}</p>
-            </div>
-          ) : (
-            <div style={insightBox}>
-              <strong>Recommendation</strong>
-              <p>{riskResult.analysis.recommendation}</p>
-            </div>
-          )}
+      {riskResult.ai ? (
+        <div style={insightBox}>
+          <strong>AI Recommended Action</strong>
+          <p>{riskResult.ai.action}</p>
+        </div>
+      ) : (
+        <div style={insightBox}>
+          <strong>Recommendation</strong>
+          <p>{riskResult.analysis.recommendation}</p>
+        </div>
+      )}
+    </>
+  ) : (
+    <div style={insightBox}>
+      <strong>No current price set</strong>
+      <p>
+        This product has no current price yet, so a pricing risk assessment
+        can't be calculated. The price shown above is a suggested starting
+        point based on cost and market data. Set a current price, then run
+        Analyze again for a full risk evaluation.
+      </p>
+    </div>
+  )}
+*/}
         </>
       )}
 
