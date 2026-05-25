@@ -546,10 +546,17 @@ export async function getAIPriceRecommendation(req, res, next) {
 
     aiRecommendation.applied_rules = ruleBasedResult.appliedRules;
 
-    await updateRecommendedPriceById(
+    //await updateRecommendedPriceById(
+      //productInput.product_id,
+    //  userId,
+    //  aiRecommendation.recommended_price
+   // );
+   updateRecommendedPriceById(
       productInput.product_id,
       userId,
       aiRecommendation.recommended_price
+    ).catch((err) =>
+      console.error("Failed to persist recommended price:", err.message)
     );
 
     return res.json({
