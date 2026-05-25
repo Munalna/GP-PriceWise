@@ -33,7 +33,7 @@ export async function generateAIPriceRecommendation(productInput, riskAnalysis) 
   const model = getGeminiModel();
 
   const prompt = `
-You are PriceWise AI, an intelligent pricing recommendation engine for Saudi cafes and restaurants.
+You are PriceWise AI, an intelligent pricing recommendation engine for Saudi cafes.
 Your task is to calculate a realistic recommended selling price in SAR for a product.
 
 Business goal:
@@ -42,7 +42,7 @@ Generate a price that is:
 - competitive in the Saudi market,
 - aligned with assigned pricing rules,
 - adjusted for active seasonal demand,
-- reasonable for restaurant customers.
+- reasonable for Saudi cafe customers.
 
 Cost definitions:
   component_cost = ingredient/recipe cost only.

@@ -196,7 +196,7 @@ const Login = ({ setToken }) => {
                     }}
                   />
                   <h1 className="signup-title">PriceWise</h1>
-                  <p className="signup-subtitle">Smart Pricing Management for Your Café & Restaurant</p>
+                  <p className="signup-subtitle">Smart Pricing Management for Saudi Cafes</p>
                 </Col>
 
                 {/* Right Side - Form */}
@@ -338,3 +338,4 @@ const Login = ({ setToken }) => {
 };
 
 export default Login;
+

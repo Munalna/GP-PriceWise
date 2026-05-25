@@ -66,7 +66,7 @@ const ForgotPassword = () => {
                     style={{ width: '150px', height: 'auto', marginTop: '15px', marginBottom: '20px' }}
                   />
                   <h1 className="signup-title">PriceWise</h1>
-                  <p className="signup-subtitle">Smart Pricing Management for Your Cafe & Restaurant</p>
+                  <p className="signup-subtitle">Smart Pricing Management for Saudi Cafes</p>
                 </Col>
 
                 <Col md={7} className="signup-form-container">
@@ -134,3 +134,4 @@ const ForgotPassword = () => {
 };
 
 export default ForgotPassword;
+
