@@ -22,6 +22,19 @@ export default function ImportSales({ userId, onSuccess }) {
     const [pendingMappedData, setPendingMappedData] = useState([]);
     const [showMissingModal, setShowMissingModal] = useState(false);
 
+    const getErrorMessage = (error) => {
+        const data = error?.response?.data;
+
+        if (error?.response?.status === 413) {
+            return 'The sales file is too large to upload. Please try a smaller file or contact support.';
+        }
+        if (typeof data === 'string') return data;
+        if (data?.error) return data.error;
+        if (data?.message) return data.message;
+
+        return error?.message || 'Something went wrong.';
+    };
+
     const buildMappedData = () => rawData.map((row) => ({
         productName: row[productCol],
         quantity: Number(row[quantityCol]) || 0,
@@ -71,8 +84,11 @@ export default function ImportSales({ userId, onSuccess }) {
         });
 
         setImportResult(response.data);
-        setSuccessMessage('Imported successfully');
-        if (onSuccess) onSuccess();
+        setSuccessMessage('');
+        setAlertMessage(response.data?.message || 'Sales data imported successfully.');
+        if (onSuccess) onSuccess(response.data);
+
+        return response.data;
     };
 
     const handleImport = async () => {
@@ -107,7 +123,7 @@ export default function ImportSales({ userId, onSuccess }) {
 
             await submitImport(mappedData);
         } catch (error) {
-            const backendMessage = error.response?.data?.error || error.response?.data || error.message;
+            const backendMessage = getErrorMessage(error);
             console.error('Import error:', backendMessage, error);
             setSuccessMessage('');
             setAlertMessage(`Import failed: ${backendMessage}`);
@@ -134,7 +150,7 @@ export default function ImportSales({ userId, onSuccess }) {
             setMissingProducts([]);
             setPendingMappedData([]);
         } catch (error) {
-            const backendMessage = error.response?.data?.error || error.response?.data || error.message;
+            const backendMessage = getErrorMessage(error);
             console.error('Draft/import error:', backendMessage, error);
             setSuccessMessage('');
             setAlertMessage(`Import failed: ${backendMessage}`);
@@ -153,13 +169,13 @@ export default function ImportSales({ userId, onSuccess }) {
             await submitImport(pendingMappedData, { ignoreMissingProducts: true });
 
             setAlertMessage(
-                `Import completed for registered products only. ${skippedCount} unregistered product${skippedCount === 1 ? '' : 's'} were skipped, so their sales are not included in analytics or reports.`
+                `Import completed for registered products only. ${skippedCount} unregistered product${skippedCount === 1 ? '' : 's'} were skipped.`
             );
             setShowMissingModal(false);
             setMissingProducts([]);
             setPendingMappedData([]);
         } catch (error) {
-            const backendMessage = error.response?.data?.error || error.response?.data || error.message;
+            const backendMessage = getErrorMessage(error);
             console.error('Import without drafts error:', backendMessage, error);
             setSuccessMessage('');
             setAlertMessage(`Import failed: ${backendMessage}`);

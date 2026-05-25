@@ -241,9 +241,13 @@ export const importSalesData = async (req, res) => {
             });
         }
 
+        const skippedRows = [];
         const salesRows = cleanedRows.map((row) => {
             const product = productMap.get(productKey(row.product_name));
-            if (!product) return null;
+            if (!product) {
+                skippedRows.push(row);
+                return null;
+            }
 
             return {
                 user_id: userId,
@@ -276,9 +280,29 @@ export const importSalesData = async (req, res) => {
 
         if (salesInsertError) throw salesInsertError;
 
+        const importedUnits = salesRows.reduce(
+            (sum, row) => sum + toNumber(row.quantity),
+            0
+        );
+        const totalFileUnits = cleanedRows.reduce(
+            (sum, row) => sum + toNumber(row.quantity),
+            0
+        );
+        const skippedUnits = skippedRows.reduce(
+            (sum, row) => sum + toNumber(row.quantity),
+            0
+        );
+
         return res.status(200).json({
             message: 'Sales data imported successfully.',
             importedCount: insertedSalesRows?.length || salesRows.length,
+            totalRowsReceived: Array.isArray(mappedData) ? mappedData.length : 0,
+            validRows: cleanedRows.length,
+            importedRows: salesRows.length,
+            importedUnits,
+            totalFileUnits,
+            skippedRowsCount: skippedRows.length,
+            skippedUnits,
             importPeriod: importPeriod || 'dates',
             newProductsAdded: false,
             newProductsCount: 0,
@@ -300,6 +324,10 @@ export const getSalesAnalytics = async (req, res) => {
     }
 
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+
         const client = supabaseAdmin || supabase;
         const { data: salesRows, error: salesError } = await client
             .from('sales_data')
