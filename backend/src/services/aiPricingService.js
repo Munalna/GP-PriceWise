@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const MODEL_NAME = "gemini-2.5-flash";
+//const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-2.5-flash-lite";
 
 function getGeminiModel() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -13,8 +14,12 @@ function getGeminiModel() {
 
   return genAI.getGenerativeModel({
     model: MODEL_NAME,
-    generationConfig: {
+    //generationConfig: {
+      //temperature: 0.2,
+      generationConfig: {
       temperature: 0.2,
+      maxOutputTokens: 600,
+      responseMimeType: "application/json",
     },
   });
 }
