@@ -245,7 +245,7 @@ const Signup = () => {
                   />
                   <h1 className="signup-title">PriceWise</h1>
                   <p className="signup-subtitle">
-                    Smart Pricing Management for Your Café & Restaurant
+                    Smart Pricing Management for Saudi Cafes
                   </p>
                 </Col>
 
@@ -283,7 +283,7 @@ const Signup = () => {
                       <Form.Control
                         type="text"
                         name="businessName"
-                        placeholder="Your café or restaurant name"
+                        placeholder="Your café name"
                         value={formData.businessName}
                         onChange={handleChange}
                         onBlur={handleBlur}
@@ -454,3 +454,4 @@ const Signup = () => {
 };
 
 export default Signup;
+
