@@ -60,7 +60,7 @@ function levenshteinRatio(a = "", b = "") {
   return 1 - d[m][n] / Math.max(m, n);
 }
 
-function marketNameSimilarity(a, b) {
+export function marketNameSimilarity(a, b) {
   const x = normalizeMarketName(a);
   const y = normalizeMarketName(b);
   if (!x || !y) return 0;
@@ -79,8 +79,7 @@ function getNameAnchor(name) {
   return tokens.sort((a, b) => b.length - a.length)[0]; // longest = key word
 }
 
-
-function hasImportantTokenOverlap(a, b) {
+export function hasImportantTokenOverlap(a, b) {
   const stopWords = new Set([
     "hot",
     "iced",
@@ -103,7 +102,7 @@ function hasImportantTokenOverlap(a, b) {
   return overlap.length >= 2;
 }
 
-const MARKET_MATCH_THRESHOLD = 0.7; // 0.5–0.7 to tune strictness
+export const MARKET_MATCH_THRESHOLD = 0.7; // 0.5–0.7 to tune strictness
 
 
 
@@ -211,25 +210,32 @@ async function getVariableComponentsCostFromProductText(userId, productComponent
   }
 
   const { data, error } = await db
-    .from("variable_components")
-    .select("id, name, cost_per_unit, unit")
-    .eq("owner_id", userId);
+    .from("components")                       // كان variable_components
+    .select("id, name, cost_per_unit, cost, unit")
+    .eq("user_id", userId);                   // كان owner_id
 
   if (error) throw error;
 
   const variableComponents = data || [];
 
   const total = parsedComponents.reduce((sum, item) => {
-    const componentName = item.name;
     const quantity = toNumber(item.qty ?? item.quantity, 0);
 
-    const dbComponent = variableComponents.find(
-      (component) =>
-        String(component.name).toLowerCase().trim() ===
-        String(componentName).toLowerCase().trim()
-    );
+    const dbComponent =
+      variableComponents.find((c) => String(c.id) === String(item.id)) ||
+      variableComponents.find(
+        (c) =>
+          String(c.name).toLowerCase().trim() ===
+          String(item.name).toLowerCase().trim()
+      );
 
-    const unitCost = toNumber(dbComponent?.cost_per_unit, 0);
+    const unitCost = toNumber(
+      dbComponent?.cost_per_unit ??
+        dbComponent?.cost ??
+        item.cost_per_unit ??   // fallback للقيمة المخزّنة داخل المنتج
+        item.cost,
+      0
+    );
 
     return sum + quantity * unitCost;
   }, 0);
