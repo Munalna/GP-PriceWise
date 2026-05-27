@@ -8,7 +8,6 @@ import {
 } from "../models/pricingRuleModel.js";
 
 const ALLOWED_RULE_TYPES = [
-  "minimum margin",
   "maximum price",
   "rounding",
   "profit margin",
@@ -48,7 +47,7 @@ function validateRuleValue(type, rawValue) {
     };
   }
 
-  if (normalizedType === "profit margin" || normalizedType === "minimum margin") {
+  if (normalizedType === "profit margin") {
     if (value <= 0 || value >= 100) {
       return {
         valid: false,

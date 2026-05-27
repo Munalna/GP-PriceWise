@@ -11,16 +11,6 @@ import {
 } from "../services/pricingRuleService";
 
 const RULE_TYPE_CONFIG = {
-  "minimum margin": {
-    label: "Minimum Margin Protection",
-    valueLabel: "Minimum Required Margin (%)",
-    unit: "%",
-    inputType: "number",
-    defaultValue: 30,
-    placeholder: "e.g., 30",
-    helperText:
-      "Sets the price floor used to cover fixed costs and minimum profit.",
-  },
   "profit margin": {
     label: "Profit Margin Rule",
     valueLabel: "Target Profit Margin (%)",
@@ -115,7 +105,7 @@ function formatRuleValue(type, value) {
   }
 
   if (
-    (ruleType === "profit margin" || ruleType === "minimum margin") &&
+    (ruleType === "profit margin" ) &&
     Number.isFinite(numericValue)
   ) {
     return `${numericValue}%`;
@@ -418,7 +408,7 @@ function PricingRuleModal({ initial, onClose, onSave }) {
       return setFormError("Value must be a valid number.");
     }
 
-    if (type === "profit margin" || type === "minimum margin") {
+    if (type === "profit margin" ) {
       if (numericValue <= 0 || numericValue >= 100) {
         return setFormError(
           "Margin must be greater than 0 and less than 100."
