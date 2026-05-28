@@ -17,13 +17,23 @@ function SignUp() {
     e.preventDefault();
     setError('');
 
+    if (fullName.trim().length === 0) {
+  setError('Business name is required');
+  return;
+}
+
+if (fullName.length > 50) {
+  setError('Business name must not exceed 50 characters');
+  return;
+}
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -93,6 +103,7 @@ function SignUp() {
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         required
+                        maxLength={50} 
                         className="py-2"
                       />
                     </Form.Group>
@@ -119,7 +130,7 @@ function SignUp() {
                         required
                         className="py-2"
                       />
-                      <Form.Text className="text-muted">Must be at least 6 characters</Form.Text>
+                      <Form.Text className="text-muted">Must be at least 8 characters</Form.Text>
                     </Form.Group>
 
                     <Form.Group className="mb-4">

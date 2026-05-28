@@ -79,10 +79,8 @@ const Signup = () => {
       case 'businessName':
         if (!value.trim()) {
           error = 'Business name is required';
-        } else if (value.length > 100) {
-          error = 'Business name must be less than 100 characters';
-        } else if (value.trim().length < 2) {
-          error = 'Business name must be at least 2 characters';
+        } else if (value.length > 50) {
+          error = 'Business name must not exceed 50 characters';
         }
         break;
       
@@ -134,11 +132,9 @@ const Signup = () => {
       errors.businessName = 'Business name is required';
     } else if (hasXSSAttempt(formData.businessName)) {
       errors.businessName = 'Invalid characters detected';
-    } else if (formData.businessName.length > 100) {
-      errors.businessName = 'Business name must be less than 100 characters';
-    } else if (formData.businessName.trim().length < 2) {
-      errors.businessName = 'Business name must be at least 2 characters';
-    }
+    } else if (formData.businessName.length > 50) {
+      errors.businessName = 'Business name must not exceed 50 characters';
+    } 
     
     // Email
     if (!formData.email.trim()) {
@@ -290,7 +286,7 @@ const Signup = () => {
                         disabled={loading}
                         className={getInputClassName('businessName')}
                         isInvalid={touched.businessName && !!fieldErrors.businessName}
-                        maxLength={100}
+                        maxLength={50}
                       />
                       {touched.businessName && fieldErrors.businessName && (
                         <Form.Control.Feedback type="invalid">
