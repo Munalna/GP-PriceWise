@@ -157,7 +157,7 @@ const Login = ({ setToken }) => {
       setToken?.(data.session);
       localStorage.setItem("supabase_token", JSON.stringify(data.session));
 
-      navigate("/dashboard");
+      navigate("/home");
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -338,4 +338,3 @@ const Login = ({ setToken }) => {
 };
 
 export default Login;
-
