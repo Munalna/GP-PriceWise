@@ -82,8 +82,8 @@ npm install
 ### Running the app
 
 ```bash
-# Start the backend (from /backend)
-npm start
+# Start the backend (from /backend) — runs with nodemon
+npm run dev
 
 # Start the frontend (from /frontend)
 npm start
