@@ -61,10 +61,6 @@ PriceWise addresses this by connecting **internal financial data** (fixed and va
 ### Installation
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd GP-PriceWise
-
 # Install backend dependencies
 cd backend
 npm install
