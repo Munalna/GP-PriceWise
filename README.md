@@ -1,36 +1,154 @@
-# GP-PriceWise
+<div align="center">
+  <img src="assets/logo.png" alt="PriceWise Logo" width="180" />
 
-Graduation Project - PriceWise (Smart Pricing Platform)
+  <h1>PriceWise</h1>
 
-## Forgot Password Setup
+  <p><strong>Smart, localized pricing advisory platform for cafés and restaurants in Saudi Arabia.</strong></p>
+</div>
+
+---
+
+PriceWise is a full-stack web application that helps small and medium-sized Saudi cafés move from guesswork to **data-driven pricing**. It combines a café's real internal costs with external market signals — competitor prices and seasonal demand — and uses an intelligent pricing engine to recommend prices that stay both **profitable** and **competitive**.
+
+> 🎓 Graduation Project — Part II (SWE 497) · Group 18 · Software Engineering Department, CCIS, King Saud University.
+
+---
+
+##  About
+
+Cafés in Saudi Arabia operate in a fast-moving market shaped by seasonal demand shifts (Ramadan, national holidays), rising operational costs, and intense local competition. Many owners still rely on manual, static pricing that lacks accuracy and real-time insight — leading to underpricing, overpricing, and lost profit.
+
+PriceWise addresses this by connecting **internal financial data** (fixed and variable costs such as rent, salaries, and ingredients) with **external market factors** (competitor prices and seasonal trends), then generating optimized price recommendations through a hybrid pricing engine and AI reasoning. Owners get clear dashboards, profit alerts, and exportable reports — all from a single platform.
+
+**Primary user:** the café Business Owner, who can manage products and costs, import sales data, view analytics, compare market prices, and receive pricing recommendations.
+
+---
+
+##  Key Features
+
+- **Cost Management** — Track fixed costs (rent, salaries) and variable cost components, with automatic allocation of fixed costs across the product catalog.
+- **Product & Recipe Setup** — Add products, define their cost components, and assign base costs.
+- **AI Pricing Engine** — A hybrid recommendation engine that combines cost calculation, competitor comparison, pricing rules, and risk analysis, enriched with **Gemini AI** reasoning to produce a recommended price plus justification, risk explanation, and suggested action.
+- **Seasonal Pricing Rules** — Define and manage pricing rules for key local periods such as Ramadan and holidays.
+- **Market Price Matching** — Compare product prices against competitor market data to gauge competitiveness.
+- **Sales Analytics** — Import sales data and explore product performance through interactive dashboards.
+- **PDF Reporting** — Export professionally formatted reports (pricing summaries, competitor comparisons, profit margin analysis).
+- **Risk & Profit Alerts** — Flag products that may be overpriced, underpriced, or financially risky.
+- **Account Management** — Registration, login, and password reset.
+
+---
+
+##  Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | React.js · Bootstrap / React-Bootstrap |
+| **Backend** | Node.js · Express · ES Modules · MVC architecture |
+| **Database & Auth** | Supabase (PostgreSQL) — JWT auth, Row-Level Security, realtime |
+| **AI** | Google Generative AI API — Gemini 2.0 Flash (`aiPricingService.js`) |
+| **Reporting** | PDFKit (`pdfService.js`) |
+
+---
+
+##  Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (LTS recommended) and npm
+- A [Supabase](https://supabase.com/) project (URL + anon key)
+- A Google Generative AI API key (for the pricing engine)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd GP-PriceWise
+
+# Install backend dependencies
+cd backend
+npm install
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+### Running the app
+
+```bash
+# Start the backend (from /backend)
+npm start
+
+# Start the frontend (from /frontend)
+npm start
+```
+
+Then configure your environment variables as described in **Configuration** below.
+
+---
+
+## ⚙️ Configuration
+
+Copy the provided example files and fill in your own values.
 
 ### Frontend `.env`
+
 Use `frontend/.env.example` as a template:
 
 - `REACT_APP_SUPABASE_URL`
 - `REACT_APP_SUPABASE_ANON_KEY`
-- `REACT_APP_FRONTEND_URL` (for reset redirect, e.g. `http://localhost:3000`)
-
-`ForgotPassword` sends users to:
-`<REACT_APP_FRONTEND_URL>/reset-password`
+- `REACT_APP_FRONTEND_URL` — used for the reset redirect, e.g. `http://localhost:3000`
 
 ### Backend `.env`
+
 Use `backend/.env.example` as a template:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (optional, for Admin API link generation)
-- `FRONTEND_URL` (fallback redirect target)
+- `SUPABASE_SERVICE_ROLE_KEY` — *optional*, for Admin API link generation
+- `FRONTEND_URL` — fallback redirect target
 
-Security warning: never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend code or public repos.
+> ⚠️ **Security warning:** never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend code or public repositories.
 
-## Auth Password Reset Endpoints
+---
 
-- `POST /api/auth/forgot-password`
-  - Body: `{ "email": "user@example.com", "redirectTo": "http://localhost:3000/reset-password" }`
-  - Uses Admin API link generation if `SUPABASE_SERVICE_ROLE_KEY` exists, otherwise Supabase hosted reset email.
+## 🔐 Forgot Password & Auth
 
-- `POST /api/auth/reset-password`
-  - Informational endpoint.
-  - Actual password update is done on frontend `/reset-password` route via recovery session and:
-    `supabase.auth.updateUser({ password: newPassword })`
+The `ForgotPassword` flow sends users to:
+
+```
+<REACT_APP_FRONTEND_URL>/reset-password
+```
+
+### Password Reset Endpoints
+
+**`POST /api/auth/forgot-password`**
+
+- Body: `{ "email": "user@example.com", "redirectTo": "http://localhost:3000/reset-password" }`
+- Uses Admin API link generation if `SUPABASE_SERVICE_ROLE_KEY` exists; otherwise falls back to the Supabase hosted reset email.
+
+**`POST /api/auth/reset-password`**
+
+- Informational endpoint.
+- The actual password update happens on the frontend `/reset-password` route via the recovery session:
+
+  ```js
+  supabase.auth.updateUser({ password: newPassword })
+  ```
+
+---
+
+## 👩‍💻 Team — Group 18
+
+| Name | Student ID |
+|---|---|
+| Muntaha Alnasser | 444200905 |
+| Sarah Albuqami | 444200576 |
+| Rowa Alshehri | 444200723 |
+| Jood Alajlan | 444201217 |
+| Tala Alrajeh | 444200459 |
+
+**Project Advisor:** L. Sarah Alkoblan
+
+Software Engineering Department · College of Computer and Information Sciences (CCIS) · King Saud University
