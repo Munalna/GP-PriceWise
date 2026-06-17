@@ -4,6 +4,14 @@
   <h1>PriceWise</h1>
 
   <p><strong>Smart, localized pricing advisory platform for cafés and restaurants in Saudi Arabia.</strong></p>
+
+  <p>
+    <a href="https://gp-price-wise.vercel.app/">
+      <img src="https://img.shields.io/badge/%F0%9F%8C%90_Live_Demo-Try_PriceWise-6C2A7E?style=for-the-badge" alt="Live Demo" />
+    </a>
+  </p>
+
+  <p><em>👉 Try it live: <a href="https://gp-price-wise.vercel.app/">gp-price-wise.vercel.app</a></em></p>
 </div>
 
 ---
@@ -14,7 +22,7 @@ PriceWise is a full-stack web application that helps small and medium-sized Saud
 
 ---
 
-##  About
+## 📖 About
 
 Cafés in Saudi Arabia operate in a fast-moving market shaped by seasonal demand shifts (Ramadan, national holidays), rising operational costs, and intense local competition. Many owners still rely on manual, static pricing that lacks accuracy and real-time insight — leading to underpricing, overpricing, and lost profit.
 
@@ -24,7 +32,7 @@ PriceWise addresses this by connecting **internal financial data** (fixed and va
 
 ---
 
-##  Key Features
+## ✨ Key Features
 
 - **Cost Management** — Track fixed costs (rent, salaries) and variable cost components, with automatic allocation of fixed costs across the product catalog.
 - **Product & Recipe Setup** — Add products, define their cost components, and assign base costs.
@@ -38,7 +46,7 @@ PriceWise addresses this by connecting **internal financial data** (fixed and va
 
 ---
 
-##  Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -47,10 +55,11 @@ PriceWise addresses this by connecting **internal financial data** (fixed and va
 | **Database & Auth** | Supabase (PostgreSQL) — JWT auth, Row-Level Security, realtime |
 | **AI** | Google Generative AI API — Gemini 2.0 Flash (`aiPricingService.js`) |
 | **Reporting** | PDFKit (`pdfService.js`) |
+| **Deployment** | Vercel |
 
 ---
 
-##  Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
