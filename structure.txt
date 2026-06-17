@@ -10,6 +10,7 @@
 │   │   ├── controllers
 │   │   │   ├── analyticsController.js
 │   │   │   ├── authController.js
+│   │   │   ├── chatbotController.js
 │   │   │   ├── costController.js
 │   │   │   ├── pricingRuleController.js
 │   │   │   ├── productController.js
@@ -37,6 +38,7 @@
 │   │   │   ├── analyticsRoutes.js
 │   │   │   ├── auth.js
 │   │   │   ├── authRoutes.js
+│   │   │   ├── chatbotRoutes.js
 │   │   │   ├── costRoutes.js
 │   │   │   ├── pricingRuleRoutes.js
 │   │   │   ├── productRoutes.js
@@ -46,10 +48,12 @@
 │   │   ├── server.js
 │   │   ├── services
 │   │   │   ├── aiPricingService.js
+│   │   │   ├── chatbotService.js
 │   │   │   ├── pdfService.js
 │   │   │   └── riskAnalysisService.js
 │   │   └── utils
-│   │       └── emailService.js
+│   │       ├── emailService.js
+│   │       └── marketMatching.js
 │   └── temp_test_import.js
 ├── frontend
 │   ├── eslint.config.js
@@ -75,15 +79,12 @@
 │   │   │   └── react.svg
 │   │   ├── client.js
 │   │   ├── components
-│   │   │   ├── analytics
-│   │   │   │   ├── RiskAlertsPanel.jsx
-│   │   │   │   ├── RiskAnalysisCard.jsx
-│   │   │   │   └── RiskAnalysisTable.jsx
 │   │   │   ├── auth
 │   │   │   │   ├── LoginForm.jsx
 │   │   │   │   └── Signup.jsx
 │   │   │   ├── common
 │   │   │   │   ├── Card.jsx
+│   │   │   │   ├── Chatbot.jsx
 │   │   │   │   ├── Navbar.jsx
 │   │   │   │   ├── Sidebar.jsx
 │   │   │   │   └── Table.jsx
@@ -117,6 +118,7 @@
 │   │   │   ├── Costs.jsx
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── ForgotPassword.jsx
+│   │   │   ├── Home.jsx
 │   │   │   ├── Login.jsx
 │   │   │   ├── PricingRules.jsx
 │   │   │   ├── Products.jsx
@@ -130,6 +132,7 @@
 │   │   │   ├── analyticsService.js
 │   │   │   ├── api.js
 │   │   │   ├── authService.js
+│   │   │   ├── chatbotService.js
 │   │   │   ├── costService.js
 │   │   │   ├── pricingRuleService.js
 │   │   │   ├── productService.js
@@ -140,5 +143,6 @@
 │   └── vite.config.js
 ├── package-lock.json
 ├── README.md
-├── structure.txt
-└── structure.txttree
+└── structure.txt
+
+26 directories, 120 files
