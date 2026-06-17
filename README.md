@@ -137,13 +137,13 @@ The `ForgotPassword` flow sends users to:
 
 ## 👩‍💻 Team — Group 18
 
-| Name | Student ID |
-|---|---|
-| Muntaha Alnasser | 444200905 |
-| Sarah Albuqami | 444200576 |
-| Rowa Alshehri | 444200723 |
-| Jood Alajlan | 444201217 |
-| Tala Alrajeh | 444200459 |
+| Name | Student ID | Role |
+|---|---|---|
+| **Muntaha Alnasser** | 444200905 | Team Leader |
+| Sarah Albuqami | 444200576 | Member |
+| Rowa Alshehri | 444200723 | Member |
+| Jood Alajlan | 444201217 | Member |
+| Tala Alrajeh | 444200459 | Member |
 
 **Project Advisor:** L. Sarah Alkoblan
 
