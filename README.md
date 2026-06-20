@@ -3,7 +3,7 @@
 
   <h1>PriceWise</h1>
 
-  <p><strong>Smart, localized pricing advisory platform for cafés and restaurants in Saudi Arabia.</strong></p>
+  <p><strong>Smart, localized pricing advisory platform for cafés in Saudi Arabia.</strong></p>
 
   <p>
     <a href="https://gp-price-wise.vercel.app/">
